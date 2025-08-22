@@ -556,6 +556,76 @@
             background: #218838;
         }
 
+        .project-management {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .project-management h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 18px;
+        }
+
+        .project-info {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .project-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .project-meta {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .project-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .save-btn {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #138496;
+        }
+
+        .load-btn {
+            background: #6f42c1;
+            color: white;
+        }
+
+        .load-btn:hover {
+            background: #5a32a3;
+        }
+
         .reset-section {
             margin-top: 20px;
             text-align: center;
@@ -601,6 +671,7 @@
         .edit-mode .people-management,
         .edit-mode .note-actions,
         .edit-mode .export-import,
+        .edit-mode .project-management,
         .edit-mode .save-project-btn {
             display: block;
         }
@@ -609,6 +680,7 @@
         .view-mode .people-management,
         .view-mode .note-actions,
         .view-mode .export-import,
+        .view-mode .project-management,
         .view-mode .save-project-btn {
             display: none;
         }
@@ -827,6 +899,19 @@
                     <button id="import-data" class="import-btn">Import Data</button>
                     <button id="debug-notes" class="export-btn" style="background: #6c757d;">Debug Notes</button>
                     <input type="file" id="import-file" accept=".json" style="display: none;" />
+                </div>
+
+                <div class="project-management edit-only">
+                    <h3>Project Management</h3>
+                    <div class="project-info" id="project-info">
+                        <div class="project-name" id="project-name">No project loaded</div>
+                        <div class="project-meta" id="project-meta"></div>
+                    </div>
+                    <div class="project-actions">
+                        <button id="save-project-as" class="project-btn save-btn">Save Project As...</button>
+                        <button id="load-project" class="project-btn load-btn">Load Project</button>
+                        <input type="file" id="load-project-file" accept=".ynp,.json" style="display: none;" />
+                    </div>
                 </div>
 
                 <div class="reset-section edit-only">

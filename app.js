@@ -40,6 +40,13 @@ class YouTubeNotesApp {
                 if (this.videoId) {
                     this.loadVideoFromId(this.videoId);
                 }
+                
+                // Initialize project info display
+                this.updateProjectInfo('Current Project', {
+                    created: new Date().toISOString(),
+                    lastModified: new Date().toISOString(),
+                    description: 'Project loaded from local storage'
+                });
             }
         } catch (error) {
             console.error('Error loading data:', error);
@@ -572,6 +579,118 @@ class YouTubeNotesApp {
         reader.readAsText(file);
     }
 
+    // Enhanced Project Management Functions
+    saveProjectAs(projectName = null, description = '') {
+        // Generate project name if not provided
+        const name = projectName || `Project_${new Date().toISOString().split('T')[0]}`;
+        
+        const projectData = {
+            metadata: {
+                name: name,
+                description: description,
+                created: new Date().toISOString(),
+                lastModified: new Date().toISOString(),
+                version: "1.0",
+                appVersion: "2.0"
+            },
+            data: {
+                youtubeId: this.videoId,
+                videoUrl: this.videoUrl,
+                people: this.people,
+                notes: this.notes,
+                settings: {
+                    currentMode: this.currentMode
+                }
+            }
+        };
+        
+        // Save as JSON file with .ynp extension
+        const blob = new Blob([JSON.stringify(projectData, null, 2)], 
+            { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}.ynp`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        
+        // Update project info display
+        this.updateProjectInfo(name, projectData.metadata);
+        
+        this.showSuccess(`Project "${name}" saved successfully!`);
+    }
+
+    loadProject(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const projectData = JSON.parse(e.target.result);
+                
+                // Check if this is a project file with metadata
+                if (projectData.metadata && projectData.data) {
+                    // Load the project data
+                    if (projectData.data.youtubeId) {
+                        this.loadVideoFromId(projectData.data.youtubeId);
+                    }
+                    
+                    this.people = projectData.data.people || [];
+                    this.notes = projectData.data.notes || [];
+                    
+                    // Update project info display
+                    this.updateProjectInfo(projectData.metadata.name, projectData.metadata);
+                    
+                    // Update UI
+                    this.saveData();
+                    this.renderPeople();
+                    this.renderNotes();
+                    this.updatePeopleFilter();
+                    this.updateNotePeopleSelect();
+                    
+                    this.showSuccess(`Project "${projectData.metadata.name}" loaded successfully!`);
+                } else {
+                    // Fallback for old format JSON files
+                    this.importData(file);
+                }
+            } catch (error) {
+                console.error('Error loading project:', error);
+                this.showError('Error loading project. Please check the file format.');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    updateProjectInfo(name, metadata) {
+        const projectNameEl = document.getElementById('project-name');
+        const projectMetaEl = document.getElementById('project-meta');
+        
+        if (projectNameEl && projectMetaEl) {
+            projectNameEl.textContent = name;
+            
+            if (metadata.created && metadata.lastModified) {
+                const created = new Date(metadata.created).toLocaleDateString();
+                const modified = new Date(metadata.lastModified).toLocaleDateString();
+                
+                projectMetaEl.innerHTML = `
+                    <div>Created: ${created}</div>
+                    <div>Last Modified: ${modified}</div>
+                    ${metadata.description ? `<div>Description: ${metadata.description}</div>` : ''}
+                `;
+            } else {
+                projectMetaEl.innerHTML = '';
+            }
+        }
+    }
+
+    showSaveProjectDialog() {
+        const name = prompt('Enter project name (optional):', `Project_${new Date().toISOString().split('T')[0]}`);
+        if (name !== null) {
+            const description = prompt('Enter project description (optional):', '');
+            this.saveProjectAs(name, description);
+        }
+    }
+
     // Save Project as HTML
     saveProjectAsHTML() {
         const data = {
@@ -649,6 +768,13 @@ class YouTubeNotesApp {
             // Reset time display
             document.getElementById('time-display').textContent = '0:00 / 0:00';
             document.getElementById('seek-progress').style.width = '0%';
+            
+            // Clear project info
+            this.updateProjectInfo('No project loaded', {
+                created: '',
+                lastModified: '',
+                description: ''
+            });
             
             // Save cleared data
             this.saveData();
@@ -1637,6 +1763,17 @@ class YouTubeNotesApp {
         document.getElementById('import-file')?.addEventListener('change', (e) => {
             if (e.target.files[0]) {
                 this.importData(e.target.files[0]);
+            }
+        });
+
+        // Project Management
+        document.getElementById('save-project-as')?.addEventListener('click', () => this.showSaveProjectDialog());
+        document.getElementById('load-project')?.addEventListener('click', () => {
+            document.getElementById('load-project-file')?.click();
+        });
+        document.getElementById('load-project-file')?.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                this.loadProject(e.target.files[0]);
             }
         });
 
