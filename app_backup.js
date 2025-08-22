@@ -1,4 +1,4 @@
-﻿// YouTube Notes App - Main Application Logic
+// YouTube Notes App - Main Application Logic
 class YouTubeNotesApp {
     constructor() {
         this.currentMode = 'edit';
@@ -623,18 +623,6 @@ class YouTubeNotesApp {
     }
 
     loadProject(file) {
-        // Validate file extension
-        if (!file.name.toLowerCase().endsWith('.ynp')) {
-            this.showError('Invalid file type. Please select a .ynp project file.');
-            return;
-        }
-        
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            this.showError('File too large. Please select a project file smaller than 10MB.');
-            return;
-        }
-        
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -667,14 +655,9 @@ class YouTubeNotesApp {
                 }
             } catch (error) {
                 console.error('Error loading project:', error);
-                this.showError('Error loading project. Please check that this is a valid .ynp project file.');
+                this.showError('Error loading project. Please check the file format.');
             }
         };
-        
-        reader.onerror = () => {
-            this.showError('Error reading file. Please try again.');
-        };
-        
         reader.readAsText(file);
     }
 
@@ -819,8 +802,6 @@ class YouTubeNotesApp {
             background: #1a1a1a;
             color: #e0e0e0;
             line-height: 1.6;
-            -webkit-text-size-adjust: 100%;
-            -webkit-tap-highlight-color: transparent;
         }
 
         .container {
@@ -1129,92 +1110,6 @@ class YouTubeNotesApp {
                 grid-template-columns: 1fr;
                 gap: 15px;
             }
-            
-            .video-controls {
-                flex-direction: column;
-                gap: 8px;
-            }
-            
-            .control-btn {
-                padding: 12px 16px;
-                font-size: 16px;
-                min-height: 44px;
-            }
-            
-            .seek-bar {
-                height: 8px;
-                min-height: 44px;
-            }
-            
-            .note-timestamp {
-                padding: 8px 12px;
-                font-size: 14px;
-                min-height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .filter-select {
-                padding: 12px;
-                font-size: 16px;
-                min-height: 44px;
-            }
-            
-            .mode-btn {
-                padding: 12px 16px;
-                font-size: 16px;
-                min-height: 44px;
-            }
-        }
-        
-        /* Mobile-specific touch improvements */
-        @media (hover: none) and (pointer: coarse) {
-            .note-timestamp:hover {
-                background: #007bff;
-            }
-            
-            .control-btn:hover {
-                background: #007bff;
-            }
-            
-            .note-item:hover {
-                transform: none;
-            }
-        }
-        
-        /* Mobile device specific styles */
-        .mobile-device .note-timestamp {
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-        }
-        
-        .mobile-device .control-btn {
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-        }
-        
-        .mobile-device .seek-bar {
-            touch-action: manipulation;
-        }
-        
-        /* Improve mobile scrolling */
-        .mobile-device .notes-list {
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Mobile-friendly filter controls */
-        .mobile-device .people-filter {
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        .mobile-device .filter-group {
-            width: 100%;
-        }
-        
-        .mobile-device .filter-select {
-            width: 100%;
         }
 
         .loading {
@@ -1269,41 +1164,8 @@ class YouTubeNotesApp {
                 this.renderNotes();
                 this.updatePeopleFilter();
                 
-                // Mobile-specific optimizations
-                this.setupMobileOptimizations();
-                
                 if (this.videoId) {
                     this.loadVideoFromId(this.videoId);
-                }
-            }
-            
-            setupMobileOptimizations() {
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
-                    // Prevent zoom on double tap
-                    let lastTouchEnd = 0;
-                    document.addEventListener('touchend', (event) => {
-                        const now = (new Date()).getTime();
-                        if (now - lastTouchEnd <= 300) {
-                            event.preventDefault();
-                        }
-                        lastTouchEnd = now;
-                    }, false);
-                    
-                    // Add mobile-specific CSS classes
-                    document.body.classList.add('mobile-device');
-                    
-                    // Show mobile help section
-                    const mobileHelp = document.getElementById('mobile-help');
-                    if (mobileHelp) {
-                        mobileHelp.style.display = 'block';
-                    }
-                    
-                    // Optimize for mobile performance
-                    if ('serviceWorker' in navigator) {
-                        // Add service worker for better mobile performance if available
-                        console.log('Service Worker supported on mobile');
-                    }
                 }
             }
 
@@ -1324,9 +1186,6 @@ class YouTubeNotesApp {
                     return;
                 }
 
-                // Mobile-specific player configuration
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
                 this.player = new YT.Player('youtube-player', {
                     height: '100%',
                     width: '100%',
@@ -1335,12 +1194,7 @@ class YouTubeNotesApp {
                         autoplay: 0,
                         controls: 1,
                         modestbranding: 1,
-                        rel: 0,
-                        playsinline: 1, // Important for mobile
-                        fs: isMobile ? 0 : 1, // Disable fullscreen on mobile for better UX
-                        iv_load_policy: 3, // Disable annotations on mobile
-                        cc_load_policy: 0, // Disable captions by default on mobile
-                        disablekb: isMobile ? 1 : 0 // Disable keyboard controls on mobile
+                        rel: 0
                     },
                     events: {
                         onReady: this.onPlayerReady.bind(this),
@@ -1370,32 +1224,7 @@ class YouTubeNotesApp {
 
             onPlayerError(event) {
                 console.error('YouTube player error:', event);
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
-                let errorMessage = 'Error loading video. Please check the URL and try again.';
-                
-                // Mobile-specific error messages
-                if (isMobile) {
-                    switch(event.data) {
-                        case 2:
-                            errorMessage = 'Mobile: Invalid video ID. Please check the URL.';
-                            break;
-                        case 5:
-                            errorMessage = 'Mobile: HTML5 player error. Try refreshing the page.';
-                            break;
-                        case 100:
-                            errorMessage = 'Mobile: Video not available on mobile. Try a different video.';
-                            break;
-                        case 101:
-                        case 150:
-                            errorMessage = 'Mobile: Video embedding not allowed on mobile.';
-                            break;
-                        default:
-                            errorMessage = 'Mobile: Video loading error. Please try again.';
-                    }
-                }
-                
-                this.showError(errorMessage);
+                this.showError('Error loading video. Please check the URL and try again.');
             }
 
             // Video Controls
@@ -1443,16 +1272,12 @@ class YouTubeNotesApp {
                     this.player.seekTo(time, true);
                     
                     // Pause after a short delay to ensure seeking completes
-                    // Use longer delay on mobile for better reliability
-                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    const delay = isMobile ? 500 : 200;
-                    
                     setTimeout(() => {
                         if (this.player && this.player.getPlayerState) {
                             this.player.pauseVideo();
                             console.log('Video paused after seeking');
                         }
-                    }, delay);
+                    }, 200);
                 } catch (error) {
                     console.error('Error seeking to time:', error);
                 }
@@ -1469,16 +1294,8 @@ class YouTubeNotesApp {
             seekBarClick(event) {
                 if (!this.player) return;
                 
-                // Handle both mouse and touch events
-                let clientX;
-                if (event.type === 'touchend' && event.changedTouches && event.changedTouches[0]) {
-                    clientX = event.changedTouches[0].clientX;
-                } else {
-                    clientX = event.clientX;
-                }
-                
                 const rect = event.currentTarget.getBoundingClientRect();
-                const clickX = clientX - rect.left;
+                const clickX = event.clientX - rect.left;
                 const percentage = clickX / rect.width;
                 const newTime = percentage * this.duration;
                 this.seekToTime(newTime);
@@ -1574,11 +1391,7 @@ class YouTubeNotesApp {
                     return \`
                     <div class="note-item" data-note-id="\${note.id}">
                         <div class="note-header">
-                            <div class="note-timestamp" 
-                                 onclick="app.seekToTime(\${timestamp})" 
-                                 ontouchstart="this.style.background='#0056b3'" 
-                                 ontouchend="this.style.background='#007bff'"
-                                 style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
+                            <div class="note-timestamp" onclick="app.seekToTime(\${timestamp})" style="cursor: pointer;">
                                 \${this.formatTime(timestamp)}
                             </div>
                             <div class="note-people">
@@ -1587,7 +1400,7 @@ class YouTubeNotesApp {
                                 ).join('')}
                             </div>
                         </div>
-                        <div class="note-text">\${this.formatTime(timestamp)} - \${this.escapeHtml(note.text)}</div>
+                        <div class="note-text">\${this.escapeHtml(note.text)}</div>
                     </div>
                 \`;
                 }).join('');
@@ -1678,49 +1491,25 @@ class YouTubeNotesApp {
                 document.getElementById('forward-5')?.addEventListener('click', () => this.jumpTime(5));
                 document.getElementById('seek-bar')?.addEventListener('click', (e) => this.seekBarClick(e));
 
-                // Mobile touch event handling
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
-                    // Add touch events for video controls
-                    document.getElementById('play-pause')?.addEventListener('touchend', (e) => {
-                        e.preventDefault();
-                        this.togglePlayPause();
-                    });
-                    document.getElementById('rewind-5')?.addEventListener('touchend', (e) => {
-                        e.preventDefault();
-                        this.jumpTime(-5);
-                    });
-                    document.getElementById('forward-5')?.addEventListener('touchend', (e) => {
-                        e.preventDefault();
-                        this.jumpTime(5);
-                    });
-                    document.getElementById('seek-bar')?.addEventListener('touchend', (e) => {
-                        e.preventDefault();
-                        this.seekBarClick(e);
-                    });
-                }
-
-                // Keyboard shortcuts (only on desktop)
-                if (!isMobile) {
-                    document.addEventListener('keydown', (e) => {
-                        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-                        
-                        switch(e.code) {
-                            case 'Space':
-                                e.preventDefault();
-                                this.togglePlayPause();
-                                break;
-                            case 'ArrowLeft':
-                                e.preventDefault();
-                                this.jumpTime(-5);
-                                break;
-                            case 'ArrowRight':
-                                e.preventDefault();
-                                this.jumpTime(5);
-                                break;
-                        }
-                    });
-                }
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                    
+                    switch(e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            this.togglePlayPause();
+                            break;
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            this.jumpTime(-5);
+                            break;
+                        case 'ArrowRight':
+                            e.preventDefault();
+                            this.jumpTime(5);
+                            break;
+                    }
+                });
 
                 // People filter
                 document.getElementById('people-filter')?.addEventListener('change', () => this.renderNotes());
@@ -1794,16 +1583,6 @@ class YouTubeNotesApp {
                 <div class="notes-list" id="notes-list">
                     <!-- Notes will be populated here -->
                 </div>
-                
-                <div id="mobile-help" style="display: none; margin-top: 20px; padding: 15px; background: #3a3a3a; border-radius: 8px; border-left: 4px solid #28a745;">
-                    <h4 style="margin-bottom: 10px; color: #28a745;">📱 Mobile Tips:</h4>
-                    <ul style="margin-left: 20px; color: #b0b0b0;">
-                        <li>Tap any timestamp to jump to that point in the video</li>
-                        <li>Use the video controls below the player</li>
-                        <li>Filter notes by selecting people from the dropdown</li>
-                        <li>Switch between View and Edit modes using the toggle</li>
-                    </ul>
-                </div>
             </div>
         </div>
     </div>
@@ -1876,81 +1655,6 @@ class YouTubeNotesApp {
         container.insertBefore(messageDiv, container.firstChild);
         
         setTimeout(() => messageDiv.remove(), 5000);
-    }
-
-    // Mobile File Input Setup
-    setupFileInputForMobile() {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            // Update file input for mobile to only accept .ynp files
-            const fileInput = document.getElementById('load-project-file');
-            if (fileInput) {
-                fileInput.accept = '.ynp';
-                fileInput.setAttribute('capture', 'false'); // Disable camera capture
-                
-                // Add mobile-specific help text if it doesn't exist
-                if (!document.getElementById('mobile-file-help')) {
-                    const helpText = document.createElement('div');
-                    helpText.id = 'mobile-file-help';
-                    helpText.innerHTML = `
-                        <div style="margin-top: 10px; padding: 10px; background: #3a3a3a; border-radius: 6px; border-left: 4px solid #28a745;">
-                            <p style="margin: 0; color: #b0b0b0; font-size: 12px;">
-                                📱 <strong>Mobile Note:</strong> Only .ynp project files can be loaded. 
-                                If you can't see .ynp files, try using the "Share" feature from your file manager.
-                            </p>
-                            <div style="margin-top: 8px; padding: 8px; background: #2a2a2a; border-radius: 4px;">
-                                <p style="margin: 0; color: #b0b0b0; font-size: 11px;">
-                                    <strong>Mobile Tips:</strong><br>
-                                    • Use your file manager app to find .ynp files<br>
-                                    • Try the "Share" button in your file manager<br>
-                                    • Make sure the file has a .ynp extension
-                                </p>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Insert help text after the load project button
-                    const loadButton = document.getElementById('load-project');
-                    if (loadButton && loadButton.parentNode) {
-                        loadButton.parentNode.insertBefore(helpText, loadButton.nextSibling);
-                    }
-                }
-            }
-            
-            // Show mobile-specific instructions
-            this.showMobileFileInstructions();
-        }
-    }
-    
-    showMobileFileInstructions() {
-        // Only show once per session
-        if (sessionStorage.getItem('mobileFileInstructionsShown')) return;
-        
-        const instructions = `
-            <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                        background: #2d2d2d; padding: 20px; border-radius: 12px; 
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.8); z-index: 10000; max-width: 90%;">
-                <h3 style="margin: 0 0 15px 0; color: #ff4444;">📱 Mobile File Loading</h3>
-                <p style="margin: 0 0 15px 0; color: #e0e0e0; line-height: 1.5;">
-                    On mobile devices, you can only load .ynp project files. Here's how:
-                </p>
-                <ol style="margin: 0 0 15px 0; color: #e0e0e0; line-height: 1.5; padding-left: 20px;">
-                    <li>Use your file manager app to find .ynp files</li>
-                    <li>Use the "Share" button in your file manager</li>
-                    <li>Select "Copy to YouTube Notes" or similar</li>
-                    <li>Or use the file picker below</li>
-                </ol>
-                <button onclick="this.parentElement.remove()" 
-                        style="width: 100%; padding: 10px; background: #007bff; color: white; 
-                               border: none; border-radius: 6px; cursor: pointer;">
-                    Got it!
-                </button>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', instructions);
-        sessionStorage.setItem('mobileFileInstructionsShown', 'true');
     }
 
     // Event Listeners Setup
@@ -2065,18 +1769,11 @@ class YouTubeNotesApp {
         // Project Management
         document.getElementById('save-project-as')?.addEventListener('click', () => this.showSaveProjectDialog());
         document.getElementById('load-project')?.addEventListener('click', () => {
-            this.setupFileInputForMobile();
             document.getElementById('load-project-file')?.click();
         });
         document.getElementById('load-project-file')?.addEventListener('change', (e) => {
             if (e.target.files[0]) {
-                const file = e.target.files[0];
-                // Validate file extension
-                if (!file.name.toLowerCase().endsWith('.ynp')) {
-                    this.showError('Please select a .ynp file only');
-                    return;
-                }
-                this.loadProject(file);
+                this.loadProject(e.target.files[0]);
             }
         });
 
