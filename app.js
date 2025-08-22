@@ -623,9 +623,13 @@ class YouTubeNotesApp {
     }
 
     loadProject(file) {
-        // Validate file extension
-        if (!file.name.toLowerCase().endsWith('.ynp')) {
-            this.showError('Invalid file type. Please select a .ynp project file.');
+        // Validate file extension - now accept .ynp, .json, and .txt
+        const validExtensions = ['.ynp', '.json', '.txt'];
+        const fileExtension = file.name.toLowerCase();
+        const hasValidExtension = validExtensions.some(ext => fileExtension.endsWith(ext));
+        
+        if (!hasValidExtension) {
+            this.showError('Invalid file type. Please select a .ynp, .json, or .txt project file.');
             return;
         }
         
@@ -1881,45 +1885,87 @@ class YouTubeNotesApp {
     // Mobile File Input Setup
     setupFileInputForMobile() {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
         
         if (isMobile) {
-            // Update file input for mobile to only accept .ynp files
+            // Update file input for mobile to force document picker on Android
             const fileInput = document.getElementById('load-project-file');
             if (fileInput) {
-                fileInput.accept = '.ynp';
-                fileInput.setAttribute('capture', 'false'); // Disable camera capture
-                
-                // Add mobile-specific help text if it doesn't exist
-                if (!document.getElementById('mobile-file-help')) {
-                    const helpText = document.createElement('div');
-                    helpText.id = 'mobile-file-help';
-                    helpText.innerHTML = `
-                        <div style="margin-top: 10px; padding: 10px; background: #3a3a3a; border-radius: 6px; border-left: 4px solid #28a745;">
-                            <p style="margin: 0; color: #b0b0b0; font-size: 12px;">
-                                📱 <strong>Mobile Note:</strong> Only .ynp project files can be loaded. 
-                                If you can't see .ynp files, try using the "Share" feature from your file manager.
-                            </p>
-                            <div style="margin-top: 8px; padding: 8px; background: #2a2a2a; border-radius: 4px;">
-                                <p style="margin: 0; color: #b0b0b0; font-size: 11px;">
-                                    <strong>Mobile Tips:</strong><br>
-                                    • Use your file manager app to find .ynp files<br>
-                                    • Try the "Share" button in your file manager<br>
-                                    • Make sure the file has a .ynp extension
-                                </p>
-                            </div>
-                        </div>
-                    `;
+                if (isAndroid) {
+                    // Force document picker on Android
+                    fileInput.accept = '.ynp,application/json,text/plain';
+                    fileInput.setAttribute('capture', 'false');
+                    fileInput.setAttribute('data-android-document', 'true');
                     
-                    // Insert help text after the load project button
-                    const loadButton = document.getElementById('load-project');
-                    if (loadButton && loadButton.parentNode) {
-                        loadButton.parentNode.insertBefore(helpText, loadButton.nextSibling);
+                    // Add Android-specific help text
+                    this.showAndroidDocumentHelp();
+                } else {
+                    // Regular mobile handling
+                    fileInput.accept = '.ynp';
+                    fileInput.setAttribute('capture', 'false');
+                    
+                    // Add mobile-specific help text if it doesn't exist
+                    if (!document.getElementById('mobile-file-help')) {
+                        const helpText = document.createElement('div');
+                        helpText.id = 'mobile-file-help';
+                        helpText.innerHTML = `
+                            <div style="margin-top: 10px; padding: 10px; background: #3a3a3a; border-radius: 6px; border-left: 4px solid #28a745;">
+                                <p style="margin: 0; color: #b0b0b0; font-size: 12px;">
+                                    📱 <strong>Mobile Note:</strong> Only .ynp project files can be loaded. 
+                                    If you can't see .ynp files, try using the "Share" feature from your file manager.
+                                </p>
+                                <div style="margin-top: 8px; padding: 8px; background: #2a2a2a; border-radius: 4px;">
+                                    <p style="margin: 0; color: #b0b0b0; font-size: 11px;">
+                                        <strong>Mobile Tips:</strong><br>
+                                        • Use your file manager app to find .ynp files<br>
+                                        • Try the "Share" button in your file manager<br>
+                                        • Make sure the file has a .ynp extension
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Insert help text after the load project button
+                        const loadButton = document.getElementById('load-project');
+                        if (loadButton && loadButton.parentNode) {
+                            loadButton.parentNode.insertBefore(helpText, loadButton.nextSibling);
+                        }
                     }
                 }
             }
             
             // Show mobile-specific instructions
             this.showMobileFileInstructions();
+        }
+    }
+    
+    // Android-specific document picker help
+    showAndroidDocumentHelp() {
+        if (document.getElementById('android-document-help')) return;
+        
+        const helpText = document.createElement('div');
+        helpText.id = 'android-document-help';
+        helpText.innerHTML = `
+            <div style="margin-top: 10px; padding: 10px; background: #3a3a3a; border-radius: 6px; border-left: 4px solid #ff9800;">
+                <p style="margin: 0; color: #e0e0e0; font-size: 12px;">
+                    🤖 <strong>Android Document Picker:</strong> This should now show document options instead of just photos/videos.
+                </p>
+                <div style="margin-top: 8px; padding: 8px; background: #2a2a2a; border-radius: 4px;">
+                    <p style="margin: 0; color: #b0b0b0; font-size: 11px;">
+                        <strong>If you still see media options:</strong><br>
+                        • Look for "Browse" or "Show all files" option<br>
+                        • Try "Files" or "My Files" app instead<br>
+                        • Use the "Share" feature from your file manager<br>
+                        • Navigate to Downloads folder manually
+                    </p>
+                </div>
+            </div>
+        `;
+        
+        // Insert help text after the load project button
+        const loadButton = document.getElementById('load-project');
+        if (loadButton && loadButton.parentNode) {
+            loadButton.parentNode.insertBefore(helpText, loadButton.nextSibling);
         }
     }
     

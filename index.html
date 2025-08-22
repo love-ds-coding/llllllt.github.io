@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="android:documentPicker" content="true" />
+    <meta name="android:fileType" content="document" />
     <title>YouTube Notes App</title>
     <style>
         * {
@@ -909,8 +911,12 @@
                     </div>
                     <div class="project-actions">
                         <button id="save-project-as" class="project-btn save-btn">Save Project As...</button>
-                        <button id="load-project" class="project-btn load-btn">Load Project (.ynp only)</button>
-                        <input type="file" id="load-project-file" accept=".ynp" style="display: none;" />
+                        <button id="load-project" class="project-btn load-btn">Load Project (.ynp/.json/.txt)</button>
+                        <input type="file" id="load-project-file" 
+                               accept=".ynp,application/json,text/plain" 
+                               capture="false"
+                               data-android-document="true"
+                               style="display: none;" />
                     </div>
                 </div>
 
