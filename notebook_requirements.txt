@@ -1,0 +1,23 @@
+# Requirements for Whisper + LLM Comparison Notebook
+# Install with: pip install -r notebook_requirements.txt
+
+# Core dependencies
+pandas>=1.5.0
+numpy>=1.21.0
+requests>=2.28.0
+
+# Whisper backends (install at least one)
+faster-whisper>=0.9.0  # Recommended - faster and more efficient
+openai-whisper>=20231117  # Alternative - OpenAI's implementation
+
+# Quality metrics
+jiwer>=3.0.0  # For Word Error Rate calculation
+
+# Jupyter (if not already installed)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Optional: for better performance
+# torch>=1.13.0  # If using GPU acceleration
+# transformers>=4.20.0  # For additional model support
+
