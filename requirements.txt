@@ -1,4 +1,16 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
 Werkzeug==2.3.7
+openai-whisper==20250625
+requests>=2.31.0
+
+# System dependencies (install separately):
+# ffmpeg - Required for Whisper audio processing
+#   Ubuntu/Debian: sudo apt install ffmpeg
+#   macOS: brew install ffmpeg  
+#   Windows: choco install ffmpeg or scoop install ffmpeg
+
+# Ollama models (install via Ollama CLI):
+#   ollama pull qwen3:0.6b
+#   ollama pull qwen2.5:7b (alternative)
 
