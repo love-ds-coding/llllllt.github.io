@@ -794,6 +794,70 @@
             margin: 15px 0;
             border: 1px solid #448b44;
         }
+
+        .note-input-container {
+            position: relative;
+        }
+
+        .voice-input-controls {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .voice-btn {
+            padding: 6px 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .voice-btn:hover {
+            background: #218838;
+        }
+
+        .voice-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .voice-btn.recording {
+            background: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-btn.recording:hover {
+            background: #c82333;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .voice-status {
+            font-size: 12px;
+            color: #b0b0b0;
+            min-height: 16px;
+        }
+
+        .voice-status.error {
+            color: #dc3545;
+        }
+
+        .voice-status.success {
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -858,7 +922,15 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Note Text</label>
-                                <textarea id="note-text" class="form-input" rows="3" placeholder="Enter your note here..." required></textarea>
+                                <div class="note-input-container">
+                                    <textarea id="note-text" class="form-input" rows="3" placeholder="Enter your note here..." required></textarea>
+                                    <div class="voice-input-controls">
+                                        <button type="button" id="voice-input-btn" class="voice-btn">
+                                            🎤 Voice Input
+                                        </button>
+                                        <div id="voice-status" class="voice-status"></div>
+                                    </div>
+                                </div>
                             </div>
                             <button type="submit" class="add-btn">Add Note</button>
                         </div>
@@ -931,5 +1003,203 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="app.js"></script>
+    <script>
+        // Voice Input Functionality
+        (function() {
+            'use strict';
+            
+            const voiceBtn = document.getElementById('voice-input-btn');
+            const voiceStatus = document.getElementById('voice-status');
+            const noteText = document.getElementById('note-text');
+            
+            let mediaRecorder = null;
+            let audioChunks = [];
+            let isRecording = false;
+            
+            // Check if browser supports audio recording
+            if (!navigator.mediaDevices || !window.MediaRecorder) {
+                voiceBtn.disabled = true;
+                voiceBtn.textContent = '🎤 Not Supported';
+                voiceStatus.textContent = 'Your browser does not support audio recording';
+                return;
+            }
+            
+            voiceBtn.addEventListener('click', toggleRecording);
+            
+            function toggleRecording() {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+            
+            async function startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
+                    
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = async () => {
+                        await processAudio();
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    voiceBtn.classList.add('recording');
+                    voiceBtn.textContent = '⏹️ Stop Recording';
+                    voiceStatus.textContent = 'Recording... Click to stop';
+                    voiceStatus.className = 'voice-status';
+                    
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    if (error.name === 'NotAllowedError') {
+                        voiceStatus.textContent = 'Microphone access denied. Please allow microphone access.';
+                    } else {
+                        voiceStatus.textContent = 'Failed to start recording: ' + error.message;
+                    }
+                    voiceStatus.className = 'voice-status error';
+                }
+            }
+            
+            function stopRecording() {
+                if (mediaRecorder && isRecording) {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    
+                    voiceBtn.classList.remove('recording');
+                    voiceBtn.textContent = '🎤 Voice Input';
+                    voiceStatus.textContent = 'Processing audio...';
+                    voiceStatus.className = 'voice-status';
+                }
+            }
+            
+            async function processAudio() {
+                try {
+                    // Convert audio to WAV format
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const wavBlob = await convertToWav(audioBlob);
+                    
+                    // Create form data for upload
+                    const formData = new FormData();
+                    formData.append('audio', wavBlob, 'voice_note.wav');
+                    
+                    // Upload to server
+                    const response = await fetch('http://localhost:5000/api/process-audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Insert the LLM output into the note text area
+                        const currentText = noteText.value;
+                        const llmOutput = result.summary;
+                        
+                        if (currentText.trim()) {
+                            // If there's existing text, append on a new line
+                            noteText.value = currentText + '\n\n' + llmOutput;
+                        } else {
+                            // If empty, just set the LLM output
+                            noteText.value = llmOutput;
+                        }
+                        
+                        voiceStatus.textContent = 'Voice note added successfully!';
+                        voiceStatus.className = 'voice-status success';
+                        
+                        // Show transcript info
+                        if (result.transcript) {
+                            voiceStatus.textContent += ` (Transcribed: "${result.transcript.substring(0, 50)}${result.transcript.length > 50 ? '...' : ''}")`;
+                        }
+                        
+                        // Clear status after 3 seconds
+                        setTimeout(() => {
+                            voiceStatus.textContent = '';
+                            voiceStatus.className = 'voice-status';
+                        }, 3000);
+                        
+                    } else {
+                        throw new Error(result.error || 'Unknown error');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error processing audio:', error);
+                    voiceStatus.textContent = 'Failed to process audio: ' + error.message;
+                    voiceStatus.className = 'voice-status error';
+                }
+            }
+            
+            async function convertToWav(audioBlob) {
+                // Simple conversion to WAV format
+                // For better quality, you could use a library like audio-recorder-polyfill
+                // This is a basic implementation that should work for most cases
+                
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Create WAV file
+                const wavBuffer = audioBufferToWav(audioBuffer);
+                return new Blob([wavBuffer], { type: 'audio/wav' });
+            }
+            
+            function audioBufferToWav(buffer) {
+                const length = buffer.length;
+                const numberOfChannels = buffer.numberOfChannels;
+                const sampleRate = buffer.sampleRate;
+                const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+                const view = new DataView(arrayBuffer);
+                
+                // WAV header
+                const writeString = (offset, string) => {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                };
+                
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, numberOfChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+                view.setUint16(32, numberOfChannels * 2, true);
+                view.setUint16(34, 16, true);
+                writeString(36, 'data');
+                view.setUint32(40, length * numberOfChannels * 2, true);
+                
+                // Audio data
+                let offset = 44;
+                for (let i = 0; i < length; i++) {
+                    for (let channel = 0; channel < numberOfChannels; channel++) {
+                        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+                        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                        offset += 2;
+                    }
+                }
+                
+                return arrayBuffer;
+            }
+        })();
+    </script>
 </body>
 </html>
