@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Processing Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ff4444;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #b0b0b0;
+            font-size: 1rem;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-section {
+            background: #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #666;
+            border-radius: 8px;
+            background: #2d2d2d;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .file-input:hover {
+            border-color: #ff4444;
+        }
+
+        .prompt-section {
+            margin-bottom: 20px;
+        }
+
+        .prompt-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+
+        .prompt-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #666;
+            border-radius: 8px;
+            background: #2d2d2d;
+            color: #e0e0e0;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .prompt-textarea:focus {
+            outline: none;
+            border-color: #ff4444;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: #cc3333;
+        }
+
+        .submit-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-card {
+            background: #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ff4444;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result-content {
+            color: #e0e0e0;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #ff4444;
+        }
+
+        .download-links {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .download-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .download-link:hover {
+            background: #0056b3;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #ff4444;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+
+        .error {
+            background: #4a1a1a;
+            border: 1px solid #ff6666;
+            color: #ffcccc;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .icon {
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🎤 Voice Processing Interface</h1>
+        <p class="subtitle">Upload audio files and process them with custom prompts using Whisper + Ollama</p>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="audioFile" class="file-input" accept="audio/*" />
+            </div>
+            
+            <div class="prompt-section">
+                <label for="customPrompt" class="prompt-label">Custom Prompt (optional):</label>
+                <textarea 
+                    id="customPrompt" 
+                    class="prompt-textarea" 
+                    placeholder="Enter your custom prompt here... (e.g., 'Analyze the sentiment of this transcript' or 'Extract key action items from this meeting')"
+                ></textarea>
+            </div>
+            
+            <button id="submitBtn" class="submit-btn">Process Audio</button>
+        </div>
+
+        <div id="loading" class="loading">
+            🚀 Processing audio... This may take a few moments.
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div id="results" class="results-section">
+            <div class="result-card">
+                <h3 class="result-title">
+                    <span class="icon">📝</span>
+                    Transcript
+                </h3>
+                <div id="transcriptContent" class="result-content"></div>
+            </div>
+
+            <div class="result-card">
+                <h3 class="result-title">
+                    <span class="icon">🤖</span>
+                    LLM Output
+                </h3>
+                <div id="llmContent" class="result-content"></div>
+                <div id="downloadLinks" class="download-links"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        document.getElementById('submitBtn').addEventListener('click', processAudio);
+        
+        async function processAudio() {
+            const audioFile = document.getElementById('audioFile').files[0];
+            const customPrompt = document.getElementById('customPrompt').value.trim();
+            
+            if (!audioFile) {
+                showError('Please select an audio file');
+                return;
+            }
+            
+            // Show loading state
+            showLoading(true);
+            hideError();
+            hideResults();
+            
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioFile);
+                
+                if (customPrompt) {
+                    formData.append('user_prompt', customPrompt);
+                }
+                
+                const response = await fetch(`${API_BASE}/api/process-audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                displayResults(result);
+                
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                showError(`Failed to process audio: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function displayResults(result) {
+            // Display transcript
+            document.getElementById('transcriptContent').textContent = result.transcript;
+            
+            // Display LLM output
+            document.getElementById('llmContent').textContent = result.summary;
+            
+            // Display download links
+            const downloadLinks = document.getElementById('downloadLinks');
+            downloadLinks.innerHTML = '';
+            
+            if (result.download_links) {
+                Object.entries(result.download_links).forEach(([type, url]) => {
+                    const link = document.createElement('a');
+                    link.href = `${API_BASE}${url}`;
+                    link.className = 'download-link';
+                    link.textContent = `Download ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+                    link.target = '_blank';
+                    downloadLinks.appendChild(link);
+                });
+            }
+            
+            showResults();
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('submitBtn').disabled = show;
+        }
+        
+        function showResults() {
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -19,7 +19,7 @@ import whisper
 app = Flask(__name__)
 
 # Allow CORS for the hosted origin (your HTML file)
-CORS(app, origins=["http://localhost:*", "file://*", "http://127.0.0.1:*"])
+CORS(app, origins=["http://localhost:*", "file://*", "http://127.0.0.1:*", "*"])
 
 # Simple in-memory storage (replace with file/database in production)
 STORAGE_DIR = "voice_notes_storage"
@@ -45,6 +45,10 @@ def process_audio():
         if audio_file.filename == '':
             return jsonify({"error": "No audio file selected"}), 400
         
+        # Get optional user prompt (backward compatible)
+        user_prompt = request.form.get('user_prompt', '')
+        default_prompt = "Summarize this transcript in 2-3 sentences"
+        
         # Generate unique ID for this note
         note_id = str(uuid.uuid4())
         
@@ -67,9 +71,17 @@ def process_audio():
         import requests
         
         try:
+            # Use custom prompt if provided, otherwise use default
+            if user_prompt:
+                prompt = f"{user_prompt}\n\nTranscript: {real_transcript}"
+                print(f"🔍 Using custom prompt: {user_prompt}")
+            else:
+                prompt = f"{default_prompt}: {real_transcript}"
+                print(f"🔍 Using default prompt: {default_prompt}")
+            
             ollama_response = requests.post("http://localhost:11434/api/generate", json={
                 "model": "qwen3:0.6b",
-                "prompt": f"Summarize this transcript in 2-3 sentences: {real_transcript}",
+                "prompt": prompt,
                 "stream": False
             })
             
@@ -283,6 +295,10 @@ def debug_ollama():
             "status": "error",
             "error": str(e)
         })
+
+@app.route('/voice-interface')
+def voice_interface():
+    return send_file('voice_interface.html')
 
 if __name__ == '__main__':
     print("🚀 Starting Voice Notes API Server...")
