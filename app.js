@@ -2342,7 +2342,13 @@ class YouTubeNotesApp {
         if (youtubePlayer) {
             youtubePlayer.style.display = 'none';
         }
-        this.webcamController.hideVideoElement();
+        
+        // Ensure video element exists before showing it
+        if (!this.webcamController.videoElement) {
+            this.webcamController.createVideoElement();
+        }
+        
+        this.webcamController.hideVideoElement(); // Hide initially, will be shown when file loads
     }
 
     switchToWebcam() {
@@ -2351,6 +2357,12 @@ class YouTubeNotesApp {
         if (youtubePlayer) {
             youtubePlayer.style.display = 'none';
         }
+        
+        // Ensure video element exists before showing it
+        if (!this.webcamController.videoElement) {
+            this.webcamController.createVideoElement();
+        }
+        
         this.webcamController.showVideoElement();
     }
 
