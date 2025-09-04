@@ -13,6 +13,10 @@ class YouTubeNotesApp {
         this.isPlaying = false;
         this.updateInterval = null;
         
+        // Add webcam controller
+        this.webcamController = new WebcamController();
+        this.currentSource = 'youtube';
+        
         this.init();
     }
 
@@ -138,77 +142,124 @@ class YouTubeNotesApp {
     }
 
     togglePlayPause() {
-        if (!this.player) return;
-        
-        if (this.isPlaying) {
-            this.player.pauseVideo();
-        } else {
-            this.player.playVideo();
+        if (this.currentSource === 'youtube') {
+            if (!this.player) return;
+            
+            if (this.isPlaying) {
+                this.player.pauseVideo();
+            } else {
+                this.player.playVideo();
+            }
+        } else if (this.currentSource === 'local' || this.currentSource === 'webcam') {
+            const videoElement = this.webcamController.videoElement;
+            if (!videoElement) return;
+            
+            if (this.isPlaying) {
+                videoElement.pause();
+            } else {
+                videoElement.play();
+            }
         }
     }
 
     seekToTime(seconds) {
         console.log('seekToTime called with:', seconds, 'Type:', typeof seconds);
         
-        if (!this.player) {
-            console.error('Player not initialized');
-            return;
-        }
-        
-        if (!this.isVideoLoaded) {
-            console.error('Video not loaded yet');
-            return;
-        }
-        
-        // Ensure seconds is a valid number
-        const time = parseFloat(seconds);
-        if (isNaN(time) || time < 0) {
-            console.error('Invalid timestamp:', seconds);
-            return;
-        }
-        
-        console.log('Seeking to time:', time, 'seconds');
-        
-        try {
-            // Seek to the specified time
-            this.player.seekTo(time, true);
+        if (this.currentSource === 'youtube') {
+            if (!this.player) {
+                console.error('Player not initialized');
+                return;
+            }
             
-            // Pause after a short delay to ensure seeking completes
-            setTimeout(() => {
-                if (this.player && this.player.getPlayerState) {
-                    this.player.pauseVideo();
-                    console.log('Video paused after seeking');
-                }
-            }, 200);
-        } catch (error) {
-            console.error('Error seeking to time:', error);
+            if (!this.isVideoLoaded) {
+                console.error('Video not loaded yet');
+                return;
+            }
+            
+            const time = parseFloat(seconds);
+            if (isNaN(time) || time < 0) {
+                console.error('Invalid timestamp:', seconds);
+                return;
+            }
+            
+            console.log('Seeking to time:', time, 'seconds');
+            
+            try {
+                this.player.seekTo(time, true);
+                setTimeout(() => {
+                    if (this.player && this.player.getPlayerState) {
+                        this.player.pauseVideo();
+                        console.log('Video paused after seeking');
+                    }
+                }, 200);
+            } catch (error) {
+                console.error('Error seeking to time:', error);
+            }
+        } else if (this.currentSource === 'local') {
+            const videoElement = this.webcamController.videoElement;
+            if (!videoElement) return;
+            
+            const time = parseFloat(seconds);
+            if (isNaN(time) || time < 0) {
+                console.error('Invalid timestamp:', seconds);
+                return;
+            }
+            
+            videoElement.currentTime = time;
         }
+        // Webcam doesn't support seeking
     }
 
     jumpTime(seconds) {
-        if (!this.player) return;
-        
-        const currentTime = this.player.getCurrentTime();
-        const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
-        this.seekToTime(newTime);
+        if (this.currentSource === 'youtube') {
+            if (!this.player) return;
+            
+            const currentTime = this.player.getCurrentTime();
+            const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
+            this.seekToTime(newTime);
+        } else if (this.currentSource === 'local') {
+            const videoElement = this.webcamController.videoElement;
+            if (!videoElement) return;
+            
+            const currentTime = videoElement.currentTime;
+            const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
+            this.seekToTime(newTime);
+        }
+        // Webcam doesn't support seeking
     }
 
     seekBarClick(event) {
-        if (!this.player) return;
-        
-        const rect = event.currentTarget.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const percentage = clickX / rect.width;
-        const newTime = percentage * this.duration;
-        this.seekToTime(newTime);
+        if (this.currentSource === 'youtube') {
+            if (!this.player) return;
+            
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            const newTime = percentage * this.duration;
+            this.seekToTime(newTime);
+        } else if (this.currentSource === 'local') {
+            const videoElement = this.webcamController.videoElement;
+            if (!videoElement) return;
+            
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            const newTime = percentage * this.duration; // Assuming duration is available for local video
+            this.seekToTime(newTime);
+        }
+        // Webcam doesn't support seeking
     }
 
     startUpdateInterval() {
         if (this.updateInterval) clearInterval(this.updateInterval);
         
         this.updateInterval = setInterval(() => {
-            if (this.player && this.isVideoLoaded) {
+            if (this.currentSource === 'youtube' && this.player && this.isVideoLoaded) {
                 this.currentTime = this.player.getCurrentTime();
+                this.updateTimeDisplay();
+                this.updateSeekBar();
+            } else if ((this.currentSource === 'local' || this.currentSource === 'webcam') && this.webcamController.videoElement) {
+                this.currentTime = this.webcamController.videoElement.currentTime;
                 this.updateTimeDisplay();
                 this.updateSeekBar();
             }
@@ -1680,6 +1731,7 @@ class YouTubeNotesApp {
                 document.getElementById('play-pause')?.addEventListener('click', () => this.togglePlayPause());
                 document.getElementById('rewind-5')?.addEventListener('click', () => this.jumpTime(-5));
                 document.getElementById('forward-5')?.addEventListener('click', () => this.jumpTime(5));
+                document.getElementById('test-seek')?.addEventListener('click', () => this.testSeeking());
                 document.getElementById('seek-bar')?.addEventListener('click', (e) => this.seekBarClick(e));
 
                 // Mobile touch event handling
@@ -1729,6 +1781,81 @@ class YouTubeNotesApp {
                 // People filter
                 document.getElementById('people-filter')?.addEventListener('change', () => this.renderNotes());
                 document.getElementById('filter-mode')?.addEventListener('change', () => this.renderNotes());
+
+                // Export/Import
+                document.getElementById('export-data')?.addEventListener('click', () => this.exportData());
+                document.getElementById('import-data')?.addEventListener('click', () => {
+                    document.getElementById('import-file')?.click();
+                });
+                document.getElementById('debug-notes')?.addEventListener('click', () => this.debugNotes());
+                document.getElementById('import-file')?.addEventListener('change', (e) => {
+                    if (e.target.files[0]) {
+                        this.importData(e.target.files[0]);
+                    }
+                });
+
+                // Project Management
+                document.getElementById('save-project-as')?.addEventListener('click', () => this.showSaveProjectDialog());
+                document.getElementById('load-project')?.addEventListener('click', () => {
+                    this.setupFileInputForMobile();
+                    document.getElementById('load-project-file')?.click();
+                });
+                document.getElementById('load-project-file')?.addEventListener('change', (e) => {
+                    if (e.target.files[0]) {
+                        const file = e.target.files[0];
+                        // Validate file extension
+                        if (!file.name.toLowerCase().endsWith('.ynp')) {
+                            this.showError('Please select a .ynp file only');
+                            return;
+                        }
+                        this.loadProject(file);
+                    }
+                });
+
+                // Save project
+                document.getElementById('save-project')?.addEventListener('click', () => this.saveProjectAsHTML());
+
+                // Reset project
+                document.getElementById('reset-project')?.addEventListener('click', () => this.resetProject());
+
+                // Source switching
+                document.querySelectorAll('input[name="video-source"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        this.switchVideoSource(e.target.value);
+                    });
+                });
+
+                // Local file handling
+                document.getElementById('local-video-file')?.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    const loadBtn = document.getElementById('load-local-video');
+                    if (loadBtn) {
+                        loadBtn.disabled = !file;
+                    }
+                });
+
+                document.getElementById('load-local-video')?.addEventListener('click', () => {
+                    const fileInput = document.getElementById('local-video-file');
+                    if (fileInput.files[0]) {
+                        this.loadLocalVideo(fileInput.files[0]);
+                    }
+                });
+
+                // Webcam handling
+                document.getElementById('start-webcam')?.addEventListener('click', () => {
+                    this.startWebcam();
+                });
+
+                // Initialize webcam controls when webcam source is selected
+                document.querySelector('input[name="video-source"][value="webcam"]')?.addEventListener('change', async () => {
+                    if (this.webcamController.cameras.length === 0) {
+                        const hasPermission = await this.webcamController.requestCameraPermission();
+                        if (hasPermission) {
+                            await this.webcamController.enumerateCameras();
+                            await this.webcamController.populateCameraSelect();
+                        }
+                    }
+                });
             }
         }
 
@@ -2131,6 +2258,302 @@ class YouTubeNotesApp {
 
         // Reset project
         document.getElementById('reset-project')?.addEventListener('click', () => this.resetProject());
+
+        // Source switching
+        document.querySelectorAll('input[name="video-source"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.switchVideoSource(e.target.value);
+            });
+        });
+
+        // Local file handling
+        document.getElementById('local-video-file')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const loadBtn = document.getElementById('load-local-video');
+            if (loadBtn) {
+                loadBtn.disabled = !file;
+            }
+        });
+
+        document.getElementById('load-local-video')?.addEventListener('click', () => {
+            const fileInput = document.getElementById('local-video-file');
+            if (fileInput.files[0]) {
+                this.loadLocalVideo(fileInput.files[0]);
+            }
+        });
+
+        // Webcam handling
+        document.getElementById('start-webcam')?.addEventListener('click', () => {
+            this.startWebcam();
+        });
+
+        // Initialize webcam controls when webcam source is selected
+        document.querySelector('input[name="video-source"][value="webcam"]')?.addEventListener('change', async () => {
+            if (this.webcamController.cameras.length === 0) {
+                const hasPermission = await this.webcamController.requestCameraPermission();
+                if (hasPermission) {
+                    await this.webcamController.enumerateCameras();
+                    await this.webcamController.populateCameraSelect();
+                }
+            }
+        });
+    }
+
+    switchVideoSource(sourceType) {
+        this.currentSource = sourceType;
+        
+        // Hide all source controls
+        document.querySelectorAll('.source-control').forEach(control => {
+            control.classList.remove('active');
+        });
+        
+        // Show selected source control
+        const targetControl = document.getElementById(`${sourceType}-controls`);
+        if (targetControl) {
+            targetControl.classList.add('active');
+        }
+        
+        // Handle source-specific logic
+        switch (sourceType) {
+            case 'youtube':
+                this.switchToYouTube();
+                break;
+            case 'local':
+                this.switchToLocal();
+                break;
+            case 'webcam':
+                this.switchToWebcam();
+                break;
+        }
+    }
+
+    switchToYouTube() {
+        // Show YouTube player, hide others
+        const youtubePlayer = document.getElementById('youtube-player');
+        if (youtubePlayer) {
+            youtubePlayer.style.display = 'block';
+        }
+        this.webcamController.hideVideoElement();
+    }
+
+    switchToLocal() {
+        // Hide YouTube player, show video element for local files
+        const youtubePlayer = document.getElementById('youtube-player');
+        if (youtubePlayer) {
+            youtubePlayer.style.display = 'none';
+        }
+        this.webcamController.hideVideoElement();
+    }
+
+    switchToWebcam() {
+        // Hide YouTube player, show video element for webcam
+        const youtubePlayer = document.getElementById('youtube-player');
+        if (youtubePlayer) {
+            youtubePlayer.style.display = 'none';
+        }
+        this.webcamController.showVideoElement();
+    }
+
+    async loadLocalVideo(file) {
+        if (!file) return;
+        
+        this.switchToLocal();
+        
+        // Create video element if it doesn't exist
+        if (!this.webcamController.videoElement) {
+            this.webcamController.createVideoElement();
+        }
+        
+        const videoElement = this.webcamController.videoElement;
+        const url = URL.createObjectURL(file);
+        videoElement.src = url;
+        videoElement.style.display = 'block';
+        
+        // Set up video event listeners
+        videoElement.onloadedmetadata = () => {
+            this.duration = videoElement.duration;
+            this.isVideoLoaded = true;
+            this.enableControls();
+            this.startUpdateInterval();
+            this.updateTimeDisplay();
+        };
+        
+        videoElement.onplay = () => {
+            this.isPlaying = true;
+            this.updatePlayPauseButton();
+        };
+        
+        videoElement.onpause = () => {
+            this.isPlaying = false;
+            this.updatePlayPauseButton();
+        };
+        
+        videoElement.ontimeupdate = () => {
+            this.currentTime = videoElement.currentTime;
+            this.updateTimeDisplay();
+            this.updateSeekBar();
+        };
+    }
+
+    async startWebcam() {
+        try {
+            const cameraSelect = document.getElementById('camera-select');
+            const selectedCameraId = cameraSelect.value;
+            
+            await this.webcamController.startWebcam(selectedCameraId);
+            this.switchToWebcam();
+            
+            // Set up video controls for webcam
+            this.duration = Infinity; // Webcam has no end
+            this.isVideoLoaded = true;
+            this.enableControls();
+            this.startUpdateInterval();
+            this.updateTimeDisplay();
+            
+            this.showSuccess('Webcam started successfully!');
+        } catch (error) {
+            this.showError('Failed to start webcam: ' + error.message);
+        }
+    }
+
+    stopWebcam() {
+        this.webcamController.stopWebcam();
+        this.isVideoLoaded = false;
+        this.isPlaying = false;
+        this.currentTime = 0;
+        this.duration = 0;
+        this.updateTimeDisplay();
+        this.updateSeekBar();
+        this.updatePlayPauseButton();
+    }
+}
+
+// Add WebcamController class before the main YouTubeNotesApp class
+class WebcamController {
+    constructor() {
+        this.stream = null;
+        this.videoElement = null;
+        this.cameras = [];
+        this.currentCameraId = null;
+    }
+
+    async enumerateCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.cameras = devices.filter(device => device.kind === 'videoinput');
+            return this.cameras;
+        } catch (error) {
+            console.error('Error enumerating cameras:', error);
+            return [];
+        }
+    }
+
+    async requestCameraPermission() {
+        try {
+            // Request permission by trying to access camera
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            // Stop the stream immediately after getting permission
+            stream.getTracks().forEach(track => track.stop());
+            return true;
+        } catch (error) {
+            console.error('Camera permission denied:', error);
+            return false;
+        }
+    }
+
+    async populateCameraSelect() {
+        const cameraSelect = document.getElementById('camera-select');
+        if (!cameraSelect) return;
+
+        // Clear existing options except the first one
+        cameraSelect.innerHTML = '<option value="">Select Camera...</option>';
+
+        if (this.cameras.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No cameras found';
+            option.disabled = true;
+            cameraSelect.appendChild(option);
+            return;
+        }
+
+        this.cameras.forEach((camera, index) => {
+            const option = document.createElement('option');
+            option.value = camera.deviceId;
+            option.textContent = camera.label || `Camera ${index + 1}`;
+            cameraSelect.appendChild(option);
+        });
+
+        cameraSelect.disabled = false;
+    }
+
+    async startWebcam(cameraId = null) {
+        try {
+            // Stop existing stream if any
+            this.stopWebcam();
+
+            const constraints = {
+                video: cameraId ? { deviceId: { exact: cameraId } } : true
+            };
+
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.currentCameraId = cameraId;
+
+            // Create video element if it doesn't exist
+            if (!this.videoElement) {
+                this.createVideoElement();
+            }
+
+            this.videoElement.srcObject = this.stream;
+            this.videoElement.play();
+
+            return true;
+        } catch (error) {
+            console.error('Error starting webcam:', error);
+            throw error;
+        }
+    }
+
+    stopWebcam() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        if (this.videoElement) {
+            this.videoElement.srcObject = null;
+        }
+        this.currentCameraId = null;
+    }
+
+    createVideoElement() {
+        const videoWrapper = document.querySelector('.video-wrapper');
+        if (!videoWrapper) return;
+
+        this.videoElement = document.createElement('video');
+        this.videoElement.id = 'webcam-video-player';
+        this.videoElement.style.display = 'none';
+        this.videoElement.style.position = 'absolute';
+        this.videoElement.style.top = '0';
+        this.videoElement.style.left = '0';
+        this.videoElement.style.width = '100%';
+        this.videoElement.style.height = '100%';
+        this.videoElement.style.objectFit = 'cover';
+        this.videoElement.muted = true;
+        this.videoElement.playsInline = true;
+
+        videoWrapper.appendChild(this.videoElement);
+    }
+
+    showVideoElement() {
+        if (this.videoElement) {
+            this.videoElement.style.display = 'block';
+        }
+    }
+
+    hideVideoElement() {
+        if (this.videoElement) {
+            this.videoElement.style.display = 'none';
+        }
     }
 }
 

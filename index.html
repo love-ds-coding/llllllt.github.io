@@ -858,6 +858,91 @@
         .voice-status.success {
             color: #28a745;
         }
+        .source-selector {
+            margin-bottom: 20px;
+        }
+
+        .source-options {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #3a3a3a;
+            border-radius: 8px;
+        }
+
+        .source-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+
+        .source-option input[type="radio"] {
+            margin: 0;
+        }
+
+        .source-option input[type="radio"]:checked + span {
+            color: #007bff;
+        }
+
+        .source-controls {
+            position: relative;
+        }
+
+        .source-control {
+            display: none;
+        }
+
+        .source-control.active {
+            display: block;
+        }
+
+        .file-input-group, .webcam-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .file-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #555;
+            border-radius: 6px;
+            font-size: 16px;
+            min-width: 300px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        .file-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .camera-select {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #555;
+            border-radius: 6px;
+            font-size: 16px;
+            min-width: 300px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        .camera-select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .camera-select:disabled {
+            background: #555;
+            color: #999;
+        }
     </style>
 </head>
 <body>
@@ -868,9 +953,43 @@
         </div>
 
         <div class="url-input-section">
-            <div class="url-input-group">
-                <input type="url" id="video-url" class="url-input" placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)" />
-                <button id="load-video" class="load-btn">Load Video</button>
+            <div class="source-selector">
+                <div class="source-options">
+                    <label class="source-option">
+                        <input type="radio" name="video-source" value="youtube" checked>
+                        <span>YouTube</span>
+                    </label>
+                    <label class="source-option">
+                        <input type="radio" name="video-source" value="local">
+                        <span>Local File</span>
+                    </label>
+                    <label class="source-option">
+                        <input type="radio" name="video-source" value="webcam">
+                        <span>Webcam</span>
+                    </label>
+                </div>
+                <div class="source-controls">
+                    <div id="youtube-controls" class="source-control active">
+                        <div class="url-input-group">
+                            <input type="url" id="video-url" class="url-input" placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)" />
+                            <button id="load-video" class="load-btn">Load Video</button>
+                        </div>
+                    </div>
+                    <div id="local-controls" class="source-control">
+                        <div class="file-input-group">
+                            <input type="file" id="local-video-file" class="file-input" accept="video/*" />
+                            <button id="load-local-video" class="load-btn" disabled>Load File</button>
+                        </div>
+                    </div>
+                    <div id="webcam-controls" class="source-control">
+                        <div class="webcam-input-group">
+                            <select id="camera-select" class="camera-select" disabled>
+                                <option value="">Select Camera...</option>
+                            </select>
+                            <button id="start-webcam" class="load-btn">Start Webcam</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
