@@ -143,12 +143,12 @@ class YouTubeNotesApp {
 
     togglePlayPause() {
         if (this.currentSource === 'youtube') {
-            if (!this.player) return;
-            
-            if (this.isPlaying) {
-                this.player.pauseVideo();
-            } else {
-                this.player.playVideo();
+        if (!this.player) return;
+        
+        if (this.isPlaying) {
+            this.player.pauseVideo();
+        } else {
+            this.player.playVideo();
             }
         } else if (this.currentSource === 'local' || this.currentSource === 'webcam') {
             const videoElement = this.webcamController.videoElement;
@@ -166,35 +166,35 @@ class YouTubeNotesApp {
         console.log('seekToTime called with:', seconds, 'Type:', typeof seconds);
         
         if (this.currentSource === 'youtube') {
-            if (!this.player) {
-                console.error('Player not initialized');
-                return;
-            }
-            
-            if (!this.isVideoLoaded) {
-                console.error('Video not loaded yet');
-                return;
-            }
-            
-            const time = parseFloat(seconds);
-            if (isNaN(time) || time < 0) {
-                console.error('Invalid timestamp:', seconds);
-                return;
-            }
-            
-            console.log('Seeking to time:', time, 'seconds');
-            
-            try {
-                this.player.seekTo(time, true);
-                setTimeout(() => {
-                    if (this.player && this.player.getPlayerState) {
-                        this.player.pauseVideo();
-                        console.log('Video paused after seeking');
-                    }
-                }, 200);
-            } catch (error) {
-                console.error('Error seeking to time:', error);
-            }
+        if (!this.player) {
+            console.error('Player not initialized');
+            return;
+        }
+        
+        if (!this.isVideoLoaded) {
+            console.error('Video not loaded yet');
+            return;
+        }
+        
+        const time = parseFloat(seconds);
+        if (isNaN(time) || time < 0) {
+            console.error('Invalid timestamp:', seconds);
+            return;
+        }
+        
+        console.log('Seeking to time:', time, 'seconds');
+        
+        try {
+            this.player.seekTo(time, true);
+            setTimeout(() => {
+                if (this.player && this.player.getPlayerState) {
+                    this.player.pauseVideo();
+                    console.log('Video paused after seeking');
+                }
+            }, 200);
+        } catch (error) {
+            console.error('Error seeking to time:', error);
+        }
         } else if (this.currentSource === 'local') {
             const videoElement = this.webcamController.videoElement;
             if (!videoElement) return;
@@ -212,31 +212,31 @@ class YouTubeNotesApp {
 
     jumpTime(seconds) {
         if (this.currentSource === 'youtube') {
-            if (!this.player) return;
-            
-            const currentTime = this.player.getCurrentTime();
-            const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
-            this.seekToTime(newTime);
+        if (!this.player) return;
+        
+        const currentTime = this.player.getCurrentTime();
+        const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
+        this.seekToTime(newTime);
         } else if (this.currentSource === 'local') {
             const videoElement = this.webcamController.videoElement;
             if (!videoElement) return;
             
             const currentTime = videoElement.currentTime;
-            const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
-            this.seekToTime(newTime);
+        const newTime = Math.max(0, Math.min(currentTime + seconds, this.duration));
+        this.seekToTime(newTime);
         }
         // Webcam doesn't support seeking
     }
 
     seekBarClick(event) {
         if (this.currentSource === 'youtube') {
-            if (!this.player) return;
-            
-            const rect = event.currentTarget.getBoundingClientRect();
-            const clickX = event.clientX - rect.left;
-            const percentage = clickX / rect.width;
-            const newTime = percentage * this.duration;
-            this.seekToTime(newTime);
+        if (!this.player) return;
+        
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const percentage = clickX / rect.width;
+        const newTime = percentage * this.duration;
+        this.seekToTime(newTime);
         } else if (this.currentSource === 'local') {
             const videoElement = this.webcamController.videoElement;
             if (!videoElement) return;
@@ -245,7 +245,7 @@ class YouTubeNotesApp {
             const clickX = event.clientX - rect.left;
             const percentage = clickX / rect.width;
             const newTime = percentage * this.duration; // Assuming duration is available for local video
-            this.seekToTime(newTime);
+        this.seekToTime(newTime);
         }
         // Webcam doesn't support seeking
     }
@@ -2449,6 +2449,15 @@ class YouTubeNotesApp {
             await this.webcamController.startWebcam(selectedCameraId);
             this.switchToWebcam();
             
+            // Show recording controls when webcam starts
+            const recordingControls = document.getElementById('recording-controls');
+            if (recordingControls) {
+                recordingControls.style.display = 'block';
+            }
+            
+            // Initialize recording button states
+            this.updateRecordingButtonStates();
+            
             // Set up video controls for webcam
             this.duration = Infinity; // Webcam has no end
             this.isVideoLoaded = true;
@@ -2475,22 +2484,47 @@ class YouTubeNotesApp {
 
     startWebcamRecording() {
         this.webcamController.startRecording();
+        this.updateRecordingButtonStates();
         this.showSuccess('Recording started');
     }
 
     pauseWebcamRecording() {
         this.webcamController.pauseRecording();
+        this.updateRecordingButtonStates();
         this.showSuccess('Recording paused');
     }
 
     resumeWebcamRecording() {
         this.webcamController.resumeRecording();
+        this.updateRecordingButtonStates();
         this.showSuccess('Recording resumed');
     }
 
     endWebcamRecording() {
         this.webcamController.stopRecording();
+        this.updateRecordingButtonStates();
         this.showSuccess('Recording ended');
+    }
+
+    updateRecordingButtonStates() {
+        const startBtn = document.getElementById('start-recording');
+        const pauseBtn = document.getElementById('pause-recording');
+        const endBtn = document.getElementById('end-recording');
+        
+        if (!startBtn || !pauseBtn || !endBtn) return;
+        
+        const isRecording = this.webcamController.isRecording;
+        const isPaused = this.webcamController.isPaused;
+        
+        // Start button: disabled when recording
+        startBtn.disabled = isRecording;
+        
+        // Pause button: enabled when recording, text changes based on state
+        pauseBtn.disabled = !isRecording;
+        pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+        
+        // End button: enabled when recording
+        endBtn.disabled = !isRecording;
     }
 }
 
@@ -2501,6 +2535,13 @@ class WebcamController {
         this.videoElement = null;
         this.cameras = [];
         this.currentCameraId = null;
+        
+        // Recording properties
+        this.mediaRecorder = null;
+        this.recordedChunks = [];
+        this.isRecording = false;
+        this.isPaused = false;
+        this.recordingBlob = null;
     }
 
     async enumerateCameras() {
@@ -2620,6 +2661,70 @@ class WebcamController {
         if (this.videoElement) {
             this.videoElement.style.display = 'none';
         }
+    }
+
+    // Recording methods
+    async startRecording() {
+        if (!this.stream) {
+            throw new Error('No webcam stream available');
+        }
+        
+        if (this.isRecording) {
+            return; // Already recording
+        }
+        
+        try {
+            this.recordedChunks = [];
+            this.mediaRecorder = new MediaRecorder(this.stream, {
+                mimeType: 'video/webm;codecs=vp9'
+            });
+            
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.recordedChunks.push(event.data);
+                }
+            };
+            
+            this.mediaRecorder.onstop = () => {
+                this.recordingBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                console.log('Recording stopped, blob created:', this.recordingBlob);
+            };
+            
+            this.mediaRecorder.start();
+            this.isRecording = true;
+            this.isPaused = false;
+            console.log('Recording started');
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            throw error;
+        }
+    }
+
+    pauseRecording() {
+        if (this.mediaRecorder && this.isRecording && !this.isPaused) {
+            this.mediaRecorder.pause();
+            this.isPaused = true;
+            console.log('Recording paused');
+        }
+    }
+
+    resumeRecording() {
+        if (this.mediaRecorder && this.isRecording && this.isPaused) {
+            this.mediaRecorder.resume();
+            this.isPaused = false;
+            console.log('Recording resumed');
+        }
+    }
+
+    stopRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            this.isPaused = false;
+            console.log('Recording stopped');
+            return this.recordingBlob;
+        }
+        return null;
     }
 }
 
