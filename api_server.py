@@ -15,6 +15,8 @@ import json
 from datetime import datetime
 import base64
 import whisper
+import hashlib
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -27,6 +29,9 @@ os.makedirs(STORAGE_DIR, exist_ok=True)
 
 # Mock data storage
 notes_db = {}
+
+RECORDED_VIDEO_DIR = "recorded_video"
+os.makedirs(RECORDED_VIDEO_DIR, exist_ok=True)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -185,6 +190,128 @@ def process_text():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/upload-recording', methods=['POST'])
+def upload_recording():
+    """Upload and save recorded webcam video"""
+    try:
+        # Validate request
+        if 'video' not in request.files:
+            return jsonify({"error": "No video file provided"}), 400
+        
+        video_file = request.files['video']
+        if video_file.filename == '':
+            return jsonify({"error": "No video file selected"}), 400
+        
+        # Validate file type
+        if not video_file.content_type or not video_file.content_type.startswith('video/'):
+            return jsonify({"error": "Invalid file type. Video files only."}), 400
+        
+        # Generate collision-safe filename
+        # Use timestamp + hash of content for uniqueness
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Read file content to generate hash
+        file_content = video_file.read()
+        file_hash = hashlib.md5(file_content).hexdigest()[:8]
+        
+        # Determine file extension from content type
+        content_type_to_ext = {
+            'video/webm': '.webm',
+            'video/mp4': '.mp4',
+            'video/avi': '.avi',
+            'video/mov': '.mov',
+            'video/quicktime': '.mov'
+        }
+        file_ext = content_type_to_ext.get(video_file.content_type, '.webm')
+        
+        # Create unique filename
+        filename = f"recording_{timestamp}_{file_hash}{file_ext}"
+        file_path = os.path.join(RECORDED_VIDEO_DIR, filename)
+        
+        # Reset file pointer and save
+        video_file.seek(0)
+        video_file.save(file_path)
+        
+        # Verify file was saved
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Failed to save video file"}), 500
+        
+        # Get file size for response
+        file_size = os.path.getsize(file_path)
+        
+        # Return success response with file info
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "file_path": file_path,
+            "file_url": f"/api/recorded-video/{filename}",
+            "file_size": file_size,
+            "content_type": video_file.content_type,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
+@app.route('/api/recorded-video/<filename>', methods=['GET'])
+def serve_recorded_video(filename):
+    """Serve recorded video files"""
+    try:
+        # Security: ensure filename is safe and exists
+        safe_filename = secure_filename(filename)
+        if safe_filename != filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        file_path = os.path.join(RECORDED_VIDEO_DIR, safe_filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Video not found"}), 404
+        
+        # Determine content type from file extension
+        ext = os.path.splitext(safe_filename)[1].lower()
+        content_types = {
+            '.webm': 'video/webm',
+            '.mp4': 'video/mp4',
+            '.avi': 'video/avi',
+            '.mov': 'video/quicktime'
+        }
+        content_type = content_types.get(ext, 'video/webm')
+        
+        return send_file(file_path, mimetype=content_type)
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to serve video: {str(e)}"}), 500
+
+@app.route('/api/recorded-videos', methods=['GET'])
+def list_recorded_videos():
+    """List all recorded videos"""
+    try:
+        videos = []
+        for filename in os.listdir(RECORDED_VIDEO_DIR):
+            if os.path.isfile(os.path.join(RECORDED_VIDEO_DIR, filename)):
+                file_path = os.path.join(RECORDED_VIDEO_DIR, filename)
+                file_stat = os.stat(file_path)
+                
+                videos.append({
+                    "filename": filename,
+                    "file_url": f"/api/recorded-video/{filename}",
+                    "file_size": file_stat.st_size,
+                    "created": datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+                    "modified": datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+                })
+        
+        # Sort by creation time (newest first)
+        videos.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({
+            "success": True,
+            "videos": videos,
+            "count": len(videos)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to list videos: {str(e)}"}), 500
+
 @app.route('/api/download/<note_id>/<file_type>', methods=['GET'])
 def download_file(note_id, file_type):
     """Download various file types for a note"""
@@ -307,6 +434,9 @@ if __name__ == '__main__':
     print("📝 API endpoints:")
     print("   POST /api/process-audio - Process audio files")
     print("   POST /api/process-text - Process text input")
+    print("   POST /api/upload-recording - Upload recorded webcam videos")
+    print("   GET  /api/recorded-video/<filename> - Serve recorded videos")
+    print("   GET  /api/recorded-videos - List all recorded videos")
     print("   GET  /api/notes - List all notes")
     print("   GET  /api/download/<id>/<type> - Download files")
     print("\n⚠️  This is a mock server - replace Whisper/Ollama calls with real APIs")
