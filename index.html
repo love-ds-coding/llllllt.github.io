@@ -943,6 +943,72 @@
             background: #555;
             color: #999;
         }
+        .recording-controls {
+            margin-top: 10px;
+            padding: 10px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            border: 1px solid #555;
+        }
+
+        .recording-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 8px;
+            transition: background 0.2s;
+        }
+
+        .recording-btn:disabled {
+            background: #555;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        #start-recording {
+            background: #dc3545;
+            color: white;
+        }
+
+        #start-recording:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        #pause-recording {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        #pause-recording:hover:not(:disabled) {
+            background: #e0a800;
+        }
+
+        #end-recording {
+            background: #6c757d;
+            color: white;
+        }
+
+        #end-recording:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        .recording-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #b0b0b0;
+            min-height: 16px;
+        }
+
+        .recording-status.recording {
+            color: #dc3545;
+        }
+
+        .recording-status.paused {
+            color: #ffc107;
+        }
     </style>
 </head>
 <body>
@@ -987,6 +1053,12 @@
                                 <option value="">Select Camera...</option>
                             </select>
                             <button id="start-webcam" class="load-btn">Start Webcam</button>
+                        </div>
+                        <div class="recording-controls" id="recording-controls" style="display: none;">
+                            <button id="start-recording" class="recording-btn">Start Recording</button>
+                            <button id="pause-recording" class="recording-btn" disabled>Pause</button>
+                            <button id="end-recording" class="recording-btn" disabled>End Recording</button>
+                            <div class="recording-status" id="recording-status"></div>
                         </div>
                     </div>
                 </div>

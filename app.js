@@ -1856,6 +1856,23 @@ class YouTubeNotesApp {
                         }
                     }
                 });
+
+                // Recording controls
+                document.getElementById('start-recording')?.addEventListener('click', () => {
+                    this.startWebcamRecording();
+                });
+
+                document.getElementById('pause-recording')?.addEventListener('click', () => {
+                    if (this.webcamController.isPaused) {
+                        this.resumeWebcamRecording();
+                    } else {
+                        this.pauseWebcamRecording();
+                    }
+                });
+
+                document.getElementById('end-recording')?.addEventListener('click', () => {
+                    this.endWebcamRecording();
+                });
             }
         }
 
@@ -2297,6 +2314,23 @@ class YouTubeNotesApp {
                 }
             }
         });
+
+        // Recording controls
+        document.getElementById('start-recording')?.addEventListener('click', () => {
+            this.startWebcamRecording();
+        });
+
+        document.getElementById('pause-recording')?.addEventListener('click', () => {
+            if (this.webcamController.isPaused) {
+                this.resumeWebcamRecording();
+            } else {
+                this.pauseWebcamRecording();
+            }
+        });
+
+        document.getElementById('end-recording')?.addEventListener('click', () => {
+            this.endWebcamRecording();
+        });
     }
 
     switchVideoSource(sourceType) {
@@ -2437,6 +2471,26 @@ class YouTubeNotesApp {
         this.updateTimeDisplay();
         this.updateSeekBar();
         this.updatePlayPauseButton();
+    }
+
+    startWebcamRecording() {
+        this.webcamController.startRecording();
+        this.showSuccess('Recording started');
+    }
+
+    pauseWebcamRecording() {
+        this.webcamController.pauseRecording();
+        this.showSuccess('Recording paused');
+    }
+
+    resumeWebcamRecording() {
+        this.webcamController.resumeRecording();
+        this.showSuccess('Recording resumed');
+    }
+
+    endWebcamRecording() {
+        this.webcamController.stopRecording();
+        this.showSuccess('Recording ended');
     }
 }
 
