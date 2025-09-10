@@ -11,6 +11,7 @@ class YouTubeNotesApp {
         this.currentTime = 0;
         this.duration = 0;
         this.isPlaying = false;
+        this.capturedTimestamp = null;
         this.updateInterval = null;
         
         // Recording time tracking properties
@@ -288,6 +289,19 @@ class YouTubeNotesApp {
             const current = this.formatTime(this.currentTime);
             const total = this.formatTime(this.duration);
             timeDisplay.textContent = `${current} / ${total}`;
+        }
+    }
+
+    updateCapturedTimeDisplay() {
+        const capturedTimeDisplay = document.getElementById('captured-time-display');
+        if (capturedTimeDisplay) {
+            if (this.capturedTimestamp !== null) {
+                const formattedTime = this.formatTime(this.capturedTimestamp);
+                capturedTimeDisplay.textContent = `Captured: ${formattedTime}`;
+                capturedTimeDisplay.style.display = 'block';
+            } else {
+                capturedTimeDisplay.style.display = 'none';
+            }
         }
     }
 
@@ -2221,6 +2235,22 @@ class YouTubeNotesApp {
             }
         });
 
+        // Capture time button
+        document.getElementById('capture-time-btn')?.addEventListener('click', () => {
+            this.capturedTimestamp = this.currentTime;
+            this.updateCapturedTimeDisplay();
+            // Clear the input field since captured time takes precedence
+            document.getElementById('note-timestamp').value = '';
+        });
+
+        // Clear captured timestamp when user types in the input field
+        document.getElementById('note-timestamp')?.addEventListener('input', () => {
+            if (this.capturedTimestamp !== null) {
+                this.capturedTimestamp = null;
+                this.updateCapturedTimeDisplay();
+            }
+        });
+
         // Add note form
         document.getElementById('add-note-form')?.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -2236,7 +2266,15 @@ class YouTubeNotesApp {
                 .map(option => option.value)
                 .filter(value => value !== ''); // Filter out the "No people selected" option
             
-            const parsedTimestamp = timestamp ? this.parseTimestamp(timestamp) : this.currentTime;
+            // Priority: 1) Input field, 2) Captured timestamp, 3) Current time
+            let parsedTimestamp;
+            if (timestamp) {
+                parsedTimestamp = this.parseTimestamp(timestamp);
+            } else if (this.capturedTimestamp !== null) {
+                parsedTimestamp = this.capturedTimestamp;
+            } else {
+                parsedTimestamp = this.currentTime;
+            }
             
             if (timestamp && parsedTimestamp === null) {
                 this.showError('Invalid timestamp format. Please use seconds (e.g., 90) or time format (e.g., 1:30)');
@@ -2249,6 +2287,8 @@ class YouTubeNotesApp {
             document.getElementById('note-text').value = '';
             peopleSelect.selectedIndex = 0; // Reset to "No people selected"
             document.getElementById('note-timestamp').value = '';
+            this.capturedTimestamp = null;
+            this.updateCapturedTimeDisplay();
         });
 
         // Add person
