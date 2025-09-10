@@ -13,6 +13,12 @@ class YouTubeNotesApp {
         this.isPlaying = false;
         this.updateInterval = null;
         
+        // Recording time tracking properties
+        this.recordingStartTime = 0;        // When recording started (timestamp)
+        this.recordingElapsedTime = 0;      // Total elapsed recording time
+        this.isRecordingTime = false;       // Whether we're currently recording
+        this.recordingPausedTime = 0;       // Time when recording was paused
+        
         // Add webcam controller
         this.webcamController = new WebcamController();
         this.currentSource = 'youtube';
@@ -258,8 +264,18 @@ class YouTubeNotesApp {
                 this.currentTime = this.player.getCurrentTime();
                 this.updateTimeDisplay();
                 this.updateSeekBar();
-            } else if ((this.currentSource === 'local' || this.currentSource === 'webcam') && this.webcamController.videoElement) {
+            } else if (this.currentSource === 'local' && this.webcamController.videoElement) {
                 this.currentTime = this.webcamController.videoElement.currentTime;
+                this.updateTimeDisplay();
+                this.updateSeekBar();
+            } else if (this.currentSource === 'webcam' && this.webcamController.videoElement) {
+                // For webcam mode, only use recording time if actually recording
+                if (this.isRecordingTime) {
+                    this.updateRecordingTime();
+                } else {
+                    // When not recording, keep time at 0
+                    this.currentTime = 0;
+                }
                 this.updateTimeDisplay();
                 this.updateSeekBar();
             }
@@ -280,6 +296,14 @@ class YouTubeNotesApp {
         if (progress && this.duration > 0) {
             const percentage = (this.currentTime / this.duration) * 100;
             progress.style.width = `${percentage}%`;
+        }
+    }
+
+    updateRecordingTime() {
+        if (this.isRecordingTime && !this.webcamController.isPaused) {
+            const now = Date.now();
+            this.recordingElapsedTime = (now - this.recordingStartTime) / 1000; // Convert to seconds
+            this.currentTime = this.recordingElapsedTime;
         }
     }
 
@@ -2336,6 +2360,14 @@ class YouTubeNotesApp {
     switchVideoSource(sourceType) {
         this.currentSource = sourceType;
         
+        // Reset recording time if switching away from webcam
+        if (sourceType !== 'webcam') {
+            this.isRecordingTime = false;
+            this.recordingStartTime = 0;
+            this.recordingElapsedTime = 0;
+            this.recordingPausedTime = 0;
+        }
+        
         // Hide all source controls
         document.querySelectorAll('.source-control').forEach(control => {
             control.classList.remove('active');
@@ -2347,17 +2379,13 @@ class YouTubeNotesApp {
             targetControl.classList.add('active');
         }
         
-        // Handle source-specific logic
-        switch (sourceType) {
-            case 'youtube':
-                this.switchToYouTube();
-                break;
-            case 'local':
-                this.switchToLocal();
-                break;
-            case 'webcam':
-                this.switchToWebcam();
-                break;
+        // Call the appropriate switch method
+        if (sourceType === 'youtube') {
+            this.switchToYouTube();
+        } else if (sourceType === 'local') {
+            this.switchToLocal();
+        } else if (sourceType === 'webcam') {
+            this.switchToWebcam();
         }
     }
 
@@ -2485,18 +2513,41 @@ class YouTubeNotesApp {
     startWebcamRecording() {
         this.webcamController.startRecording();
         this.updateRecordingButtonStates();
+        
+        // Start recording time tracking (webcam mode only)
+        if (this.currentSource === 'webcam') {
+            this.recordingStartTime = Date.now();
+            this.recordingElapsedTime = 0;
+            this.isRecordingTime = true;
+            this.recordingPausedTime = 0;
+        }
+        
         this.showSuccess('Recording started');
     }
 
     pauseWebcamRecording() {
         this.webcamController.pauseRecording();
         this.updateRecordingButtonStates();
+        
+        // Pause recording time tracking (webcam mode only)
+        if (this.currentSource === 'webcam' && this.isRecordingTime) {
+            this.recordingPausedTime = Date.now();
+        }
+        
         this.showSuccess('Recording paused');
     }
 
     resumeWebcamRecording() {
         this.webcamController.resumeRecording();
         this.updateRecordingButtonStates();
+        
+        // Resume recording time tracking (webcam mode only)
+        if (this.currentSource === 'webcam' && this.isRecordingTime && this.recordingPausedTime > 0) {
+            const pauseDuration = Date.now() - this.recordingPausedTime;
+            this.recordingStartTime += pauseDuration; // Adjust start time to account for pause
+            this.recordingPausedTime = 0;
+        }
+        
         this.showSuccess('Recording resumed');
     }
 
@@ -2504,6 +2555,15 @@ class YouTubeNotesApp {
         try {
             const blob = await this.webcamController.stopRecording();
             this.updateRecordingButtonStates();
+            
+            // Reset recording time tracking (webcam mode only)
+            if (this.currentSource === 'webcam') {
+                this.isRecordingTime = false;
+                this.recordingStartTime = 0;
+                this.recordingElapsedTime = 0;
+                this.recordingPausedTime = 0;
+                this.currentTime = 0;
+            }
             
             if (blob && blob.size > 0) {
                 this.downloadRecording(blob);
@@ -2515,6 +2575,22 @@ class YouTubeNotesApp {
             console.error('Error ending recording:', error);
             this.showError('Error ending recording: ' + error.message);
         }
+    }
+
+    downloadRecording(blob) {
+        if (!blob || blob.size === 0) {
+            this.showError('No recording data available');
+            return;
+        }
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `webcam-recording-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     updateRecordingButtonStates() {
@@ -2536,22 +2612,6 @@ class YouTubeNotesApp {
         
         // End button: enabled when recording
         endBtn.disabled = !isRecording;
-    }
-
-    downloadRecording(blob) {
-        if (!blob || blob.size === 0) {
-            this.showError('No recording data available');
-            return;
-        }
-        
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `webcam-recording-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.webm`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     }
 }
 
