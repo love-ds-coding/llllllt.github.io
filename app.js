@@ -2500,10 +2500,21 @@ class YouTubeNotesApp {
         this.showSuccess('Recording resumed');
     }
 
-    endWebcamRecording() {
-        this.webcamController.stopRecording();
-        this.updateRecordingButtonStates();
-        this.showSuccess('Recording ended');
+    async endWebcamRecording() {
+        try {
+            const blob = await this.webcamController.stopRecording();
+            this.updateRecordingButtonStates();
+            
+            if (blob && blob.size > 0) {
+                this.downloadRecording(blob);
+                this.showSuccess('Recording saved and downloaded!');
+            } else {
+                this.showError('No recording data available');
+            }
+        } catch (error) {
+            console.error('Error ending recording:', error);
+            this.showError('Error ending recording: ' + error.message);
+        }
     }
 
     updateRecordingButtonStates() {
@@ -2525,6 +2536,22 @@ class YouTubeNotesApp {
         
         // End button: enabled when recording
         endBtn.disabled = !isRecording;
+    }
+
+    downloadRecording(blob) {
+        if (!blob || blob.size === 0) {
+            this.showError('No recording data available');
+            return;
+        }
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `webcam-recording-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 }
 
@@ -2717,14 +2744,21 @@ class WebcamController {
     }
 
     stopRecording() {
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
-            this.isRecording = false;
-            this.isPaused = false;
-            console.log('Recording stopped');
-            return this.recordingBlob;
-        }
-        return null;
+        return new Promise((resolve) => {
+            if (this.mediaRecorder && this.isRecording) {
+                this.mediaRecorder.onstop = () => {
+                    this.recordingBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                    this.isRecording = false;
+                    this.isPaused = false;
+                    console.log('Recording stopped, blob created:', this.recordingBlob);
+                    resolve(this.recordingBlob);
+                };
+                
+                this.mediaRecorder.stop();
+            } else {
+                resolve(null);
+            }
+        });
     }
 }
 
