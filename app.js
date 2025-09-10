@@ -2681,16 +2681,170 @@ class WebcamController {
         cameraSelect.disabled = false;
     }
 
+    async detectWebcamCapabilities() {
+        try {
+            // First, get basic stream to detect capabilities
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true, 
+                audio: true 
+            });
+            
+            const videoTrack = stream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings();
+            const capabilities = videoTrack.getCapabilities();
+            
+            console.log('Current settings:', settings);
+            console.log('Available capabilities:', capabilities);
+            
+            // Stop the test stream
+            stream.getTracks().forEach(track => track.stop());
+            
+            return {
+                currentResolution: `${settings.width}x${settings.height}`,
+                currentFrameRate: settings.frameRate,
+                maxWidth: capabilities.width?.max || 1920,
+                maxHeight: capabilities.height?.max || 1080,
+                maxFrameRate: capabilities.frameRate?.max || 30,
+                supportedResolutions: this.getSupportedResolutions(capabilities)
+            };
+        } catch (error) {
+            console.error('Error detecting webcam capabilities:', error);
+            return null;
+        }
+    }
+
+    getSupportedResolutions(capabilities) {
+        const resolutions = [
+            { width: 1920, height: 1080, frameRate: 60 },
+            { width: 1920, height: 1080, frameRate: 30 },
+            { width: 1280, height: 720, frameRate: 60 },
+            { width: 1280, height: 720, frameRate: 30 },
+            { width: 640, height: 480, frameRate: 30 }
+        ];
+        
+        return resolutions.filter(res => 
+            res.width <= (capabilities.width?.max || 1920) &&
+            res.height <= (capabilities.height?.max || 1080) &&
+            res.frameRate <= (capabilities.frameRate?.max || 30)
+        );
+    }
+
+    getBestSupportedMimeType() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        
+        // Priority order based on browser and quality
+        const codecPriority = [];
+        
+        if (userAgent.includes('chrome') || userAgent.includes('edge')) {
+            codecPriority.push(
+                'video/webm;codecs=h264',  // Best for Chrome
+                'video/webm;codecs=vp9',   // Good fallback
+                'video/webm;codecs=vp8'    // Universal fallback
+            );
+        } else if (userAgent.includes('firefox')) {
+            codecPriority.push(
+                'video/webm;codecs=vp9',   // Best for Firefox
+                'video/webm;codecs=vp8'    // Fallback
+            );
+        } else if (userAgent.includes('safari')) {
+            codecPriority.push(
+                'video/mp4;codecs=h264',   // Best for Safari
+                'video/webm;codecs=h264'   // Fallback
+            );
+        } else {
+            // Default priority
+            codecPriority.push(
+                'video/webm;codecs=h264',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8'
+            );
+        }
+        
+        for (const codec of codecPriority) {
+            if (MediaRecorder.isTypeSupported(codec)) {
+                console.log('Selected codec:', codec);
+                return codec;
+            }
+        }
+        
+        console.warn('No supported codec found, using default');
+        return 'video/webm';
+    }
+
+    getMediaRecorderOptions() {
+        const mimeType = this.getBestSupportedMimeType();
+        const options = { mimeType };
+        
+        // Get actual video settings
+        const videoTrack = this.stream?.getVideoTracks()[0];
+        const settings = videoTrack?.getSettings() || {};
+        const resolution = (settings.width || 1280) * (settings.height || 720);
+        const frameRate = settings.frameRate || 30;
+        
+        // Calculate bitrate based on resolution and frame rate
+        let videoBitrate;
+        if (resolution >= 1920 * 1080) { // 1080p
+            videoBitrate = frameRate >= 60 ? 8000000 : 5000000; // 8 Mbps for 60fps, 5 Mbps for 30fps
+        } else if (resolution >= 1280 * 720) { // 720p
+            videoBitrate = frameRate >= 60 ? 4000000 : 2500000; // 4 Mbps for 60fps, 2.5 Mbps for 30fps
+        } else { // Lower resolution
+            videoBitrate = 1500000; // 1.5 Mbps
+        }
+        
+        options.videoBitsPerSecond = videoBitrate;
+        options.audioBitsPerSecond = 192000; // 192 kbps for high quality audio
+        
+        console.log('MediaRecorder options:', {
+            mimeType,
+            videoBitrate: `${(videoBitrate / 1000000).toFixed(1)} Mbps`,
+            audioBitrate: '192 kbps',
+            resolution: `${settings.width}x${settings.height}`,
+            frameRate: `${frameRate} fps`
+        });
+        
+        return options;
+    }
+
     async startWebcam(cameraId = null) {
         try {
             // Stop existing stream if any
             this.stopWebcam();
-
+            
+            // Detect webcam capabilities first
+            const capabilities = await this.detectWebcamCapabilities();
+            console.log('Webcam capabilities:', capabilities);
+            
+            // Try to get the highest quality first
             const constraints = {
-                video: cameraId ? { deviceId: { exact: cameraId } } : true
+                video: {
+                    deviceId: cameraId ? { exact: cameraId } : undefined,
+                    width: { ideal: 1920, min: 1280 },
+                    height: { ideal: 1080, min: 720 },
+                    frameRate: { ideal: 60, min: 30 },
+                    facingMode: cameraId ? undefined : 'user'
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000
+                }
             };
-
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('High quality stream obtained');
+            } catch (error) {
+                console.log('High quality failed, trying medium quality...');
+                // Fallback to medium quality
+                constraints.video.width = { ideal: 1280, min: 640 };
+                constraints.video.height = { ideal: 720, min: 480 };
+                constraints.video.frameRate = { ideal: 30, min: 15 };
+                
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('Medium quality stream obtained');
+            }
+            
             this.currentCameraId = cameraId;
 
             // Create video element if it doesn't exist
@@ -2700,7 +2854,17 @@ class WebcamController {
 
             this.videoElement.srcObject = this.stream;
             this.videoElement.play();
+            
+            // Log actual settings achieved
+            const videoTrack = this.stream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings();
+            console.log('Actual video settings:', {
+                resolution: `${settings.width}x${settings.height}`,
+                frameRate: settings.frameRate,
+                codec: settings.codec
+            });
 
+            this.showVideoElement();
             return true;
         } catch (error) {
             console.error('Error starting webcam:', error);
@@ -2717,6 +2881,25 @@ class WebcamController {
             this.videoElement.srcObject = null;
         }
         this.currentCameraId = null;
+    }
+
+    async testWebcamCapabilities() {
+        console.log('=== Webcam Capabilities Test ===');
+        
+        // Test codec support
+        console.log('Codec Support:');
+        console.log('H.264 WebM:', MediaRecorder.isTypeSupported('video/webm;codecs=h264'));
+        console.log('H.264 MP4:', MediaRecorder.isTypeSupported('video/mp4;codecs=h264'));
+        console.log('VP8:', MediaRecorder.isTypeSupported('video/webm;codecs=vp8'));
+        console.log('VP9:', MediaRecorder.isTypeSupported('video/webm;codecs=vp9'));
+        
+        // Test webcam capabilities
+        const capabilities = await this.detectWebcamCapabilities();
+        if (capabilities) {
+            console.log('Webcam Capabilities:', capabilities);
+        }
+        
+        return capabilities;
     }
 
     createVideoElement() {
@@ -2762,25 +2945,34 @@ class WebcamController {
         
         try {
             this.recordedChunks = [];
-            this.mediaRecorder = new MediaRecorder(this.stream, {
-                mimeType: 'video/webm;codecs=vp9'
-            });
+            const options = this.getMediaRecorderOptions();
+            
+            console.log('Creating MediaRecorder with options:', options);
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
             
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     this.recordedChunks.push(event.data);
+                    console.log('Data chunk received:', event.data.size, 'bytes');
                 }
             };
             
             this.mediaRecorder.onstop = () => {
-                this.recordingBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                const mimeType = this.getBestSupportedMimeType();
+                this.recordingBlob = new Blob(this.recordedChunks, { type: mimeType });
                 console.log('Recording stopped, blob created:', this.recordingBlob);
+                console.log('Final MIME type:', mimeType);
             };
             
-            this.mediaRecorder.start();
+            this.mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+            };
+            
+            // Start recording with timeslice for better chunking
+            this.mediaRecorder.start(1000); // 1 second chunks
             this.isRecording = true;
             this.isPaused = false;
-            console.log('Recording started');
+            console.log('Recording started with codec:', options.mimeType);
         } catch (error) {
             console.error('Error starting recording:', error);
             throw error;
