@@ -9,6 +9,19 @@ librosa>=0.10.0
 soundfile>=0.12.0
 torch>=1.13.0
 
+# FireRedASR dependencies
+transformers>=4.30.0
+accelerate>=0.20.0
+torchaudio>=0.13.0
+numpy>=1.21.0
+scipy>=1.7.0
+scikit-learn>=1.0.0
+kaldiio>=2.18.0
+# k2>=1.23.0
+lhotse>=1.22.0
+kaldi_native_fbank
+sentencepiece
+
 # System dependencies (install separately):
 # ffmpeg - Required for Whisper audio processing
 #   Ubuntu/Debian: sudo apt install ffmpeg

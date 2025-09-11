@@ -18,6 +18,14 @@ import whisper
 import hashlib
 from werkzeug.utils import secure_filename
 
+# Import ASR engines
+try:
+    from firered_engine import FireRedEngine
+    FIRERED_AVAILABLE = True
+except ImportError:
+    FIRERED_AVAILABLE = False
+    print("⚠️ FireRedASR not available. Only Whisper will be supported.")
+
 app = Flask(__name__)
 
 # Allow CORS for the hosted origin (your HTML file)
@@ -32,6 +40,76 @@ notes_db = {}
 
 RECORDED_VIDEO_DIR = "recorded_video"
 os.makedirs(RECORDED_VIDEO_DIR, exist_ok=True)
+
+# Global ASR engines (lazy loading)
+whisper_models = {}
+firered_engine = None
+
+def get_asr_engine(asr_model: str = "whisper", whisper_model_size: str = "tiny"):
+    """
+    Get ASR engine instance with lazy loading
+    
+    Args:
+        asr_model: "whisper" or "firered"
+        whisper_model_size: Whisper model size (tiny, base, small, medium, large-v3)
+    
+    Returns:
+        ASR engine instance
+    """
+    global whisper_models, firered_engine
+    
+    if asr_model == "whisper":
+        if whisper_model_size not in whisper_models:
+            print(f"🎤 Loading Whisper model: {whisper_model_size}")
+            whisper_models[whisper_model_size] = whisper.load_model(whisper_model_size)
+        return whisper_models[whisper_model_size]
+    
+    elif asr_model == "firered":
+        if not FIRERED_AVAILABLE:
+            raise Exception("FireRedASR not available. Please install FireRedASR and download models.")
+        
+        if firered_engine is None:
+            print("🎤 Loading FireRedASR model...")
+            firered_engine = FireRedEngine()
+        return firered_engine
+    
+    else:
+        raise ValueError(f"Unsupported ASR model: {asr_model}")
+
+def transcribe_audio(audio_path: str, asr_model: str = "whisper", whisper_model_size: str = "tiny") -> dict:
+    """
+    Transcribe audio using the specified ASR model
+    
+    Args:
+        audio_path: Path to audio file
+        asr_model: "whisper" or "firered"
+        whisper_model_size: Whisper model size
+    
+    Returns:
+        Dictionary with transcription results
+    """
+    if asr_model == "whisper":
+        model = get_asr_engine("whisper", whisper_model_size)
+        print("🎵 Transcribing with Whisper...")
+        result = model.transcribe(audio_path)
+        return {
+            "text": result["text"].strip(),
+            "model": f"whisper-{whisper_model_size}",
+            "engine": "whisper"
+        }
+    
+    elif asr_model == "firered":
+        engine = get_asr_engine("firered")
+        print("🎵 Transcribing with FireRedASR...")
+        result = engine.transcribe(audio_path)
+        return {
+            "text": result["text"],
+            "model": result["model"],
+            "engine": result["engine"]
+        }
+    
+    else:
+        raise ValueError(f"Unsupported ASR model: {asr_model}")
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -50,9 +128,17 @@ def process_audio():
         if audio_file.filename == '':
             return jsonify({"error": "No audio file selected"}), 400
         
-        # Get optional user prompt (backward compatible)
+        # Get optional parameters
         user_prompt = request.form.get('user_prompt', '')
+        asr_model = request.form.get('asr_model', 'whisper')  # Default to whisper for backward compatibility
+        whisper_model_size = request.form.get('whisper_model', 'tiny')  # Whisper model size
+        summ_model = request.form.get('summ_model', 'qwen3:0.6b')  # Summary model
+        
         default_prompt = "Summarize this transcript in 2-3 sentences"
+        
+        # Validate ASR model
+        if asr_model not in ['whisper', 'firered']:
+            return jsonify({"error": f"Unsupported ASR model: {asr_model}. Use 'whisper' or 'firered'."}), 400
         
         # Generate unique ID for this note
         note_id = str(uuid.uuid4())
@@ -61,12 +147,10 @@ def process_audio():
         audio_path = os.path.join(STORAGE_DIR, f"{note_id}.wav")
         audio_file.save(audio_path)
         
-        # Real transcript using local Whisper model
-        print("🎤 Loading Whisper model...")
-        model = whisper.load_model("tiny")
-        print(" Transcribing audio...")
-        result = model.transcribe(audio_path)
-        real_transcript = result["text"]
+        # Transcribe audio using selected ASR model
+        print(f"🎤 Using ASR model: {asr_model}")
+        transcription_result = transcribe_audio(audio_path, asr_model, whisper_model_size)
+        real_transcript = transcription_result["text"]
         
         # Print the transcribed text for debugging
         print(f"📝 Transcribed text: {real_transcript}")
@@ -85,7 +169,7 @@ def process_audio():
                 print(f"🔍 Using default prompt: {default_prompt}")
             
             ollama_response = requests.post("http://localhost:11434/api/generate", json={
-                "model": "qwen3:0.6b",
+                "model": summ_model,
                 "prompt": prompt,
                 "stream": False
             })
@@ -129,7 +213,10 @@ def process_audio():
             "transcript": real_transcript,
             "summary": real_summary,
             "duration": "00:00:15",  # You could calculate real duration here
-            "file_size": os.path.getsize(audio_path)
+            "file_size": os.path.getsize(audio_path),
+            "asr_model": transcription_result["model"],
+            "asr_engine": transcription_result["engine"],
+            "summ_model": summ_model
         }
         
         # Store in memory (replace with persistent storage)
@@ -140,6 +227,9 @@ def process_audio():
             "note_id": note_id,
             "transcript": real_transcript,
             "summary": real_summary,
+            "asr_model_used": transcription_result["model"],
+            "asr_engine_used": transcription_result["engine"],
+            "summ_model_used": summ_model,
             "download_links": {
                 "audio": f"/api/download/{note_id}/audio",
                 "transcript": f"/api/download/{note_id}/transcript",
@@ -159,10 +249,36 @@ def process_text():
             return jsonify({"error": "No text provided"}), 400
         
         text = data['text']
+        summ_model = data.get('summ_model', 'qwen3:0.6b')  # Default summary model
         note_id = str(uuid.uuid4())
         
-        # Mock summary (replace with actual Ollama API call)
-        mock_summary = f"Mock summary of text input: {text[:50]}{'...' if len(text) > 50 else ''}"
+        # Real summary using Ollama
+        print(f"🔍 Generating summary with model: {summ_model}")
+        import requests
+        
+        try:
+            prompt = f"Summarize this text in 2-3 sentences: {text}"
+            
+            ollama_response = requests.post("http://localhost:11434/api/generate", json={
+                "model": summ_model,
+                "prompt": prompt,
+                "stream": False
+            })
+            
+            if ollama_response.status_code != 200:
+                raise Exception(f"Ollama API returned status {ollama_response.status_code}")
+            
+            ollama_json = ollama_response.json()
+            if "response" not in ollama_json:
+                raise Exception("Ollama response missing 'response' key")
+            
+            real_summary = ollama_json["response"]
+            print(f"✅ Generated summary: {real_summary}")
+            
+        except Exception as e:
+            print(f"❌ Error with Ollama: {e}")
+            # Fallback to mock summary
+            real_summary = f"Mock summary of text input: {text[:50]}{'...' if len(text) > 50 else ''}"
         
         # Create note record
         note_data = {
@@ -170,8 +286,9 @@ def process_text():
             "timestamp": datetime.now().isoformat(),
             "type": "text",
             "text": text,
-            "summary": mock_summary,
-            "word_count": len(text.split())
+            "summary": real_summary,
+            "word_count": len(text.split()),
+            "summ_model": summ_model
         }
         
         # Store in memory
@@ -180,7 +297,8 @@ def process_text():
         return jsonify({
             "success": True,
             "note_id": note_id,
-            "summary": mock_summary,
+            "summary": real_summary,
+            "summ_model_used": summ_model,
             "download_links": {
                 "text": f"/api/download/{note_id}/text",
                 "summary": f"/api/download/{note_id}/summary"

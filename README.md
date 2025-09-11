@@ -92,10 +92,160 @@ A minimal, responsive web application for creating timestamped, person-tagged no
 
 ```
 project_video_note2/
-├── index.html          # Main application file
-├── app.js             # JavaScript application logic
-└── README.md          # This documentation
+├── index.html              # Main application file
+├── app.js                 # JavaScript application logic
+├── api_server.py          # Flask API server with ASR support
+├── fireredasr/            # FireRedASR Python package
+├── pretrained_models/     # ASR model files
+│   └── FireRedASR-AED-L/
+├── requirements.txt       # Python dependencies
+├── audio_utils.py         # Audio preprocessing utilities
+├── firered_engine.py      # FireRedASR engine wrapper
+└── README.md              # This documentation
 ```
+
+## ASR (Automatic Speech Recognition) Setup
+
+This project supports two ASR engines: **Whisper** and **FireRedASR**.
+
+### Quick Start (Whisper Only)
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Start the API server
+python api_server.py
+```
+
+### Full Setup (Whisper + FireRedASR)
+
+#### 1. Install Python Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### 2. Install FFmpeg (Required for audio processing)
+- **Windows**: `choco install ffmpeg` or `scoop install ffmpeg`
+- **macOS**: `brew install ffmpeg`
+- **Ubuntu/Debian**: `sudo apt install ffmpeg`
+
+#### 3. Download FireRedASR Models
+
+**Option A: Using Hugging Face CLI (Recommended)**
+```bash
+# Install Hugging Face CLI
+pip install huggingface_hub
+
+# Create model directory
+mkdir -p pretrained_models
+
+# Download FireRedASR-AED-L model
+huggingface-cli download FireRedTeam/FireRedASR-AED-L --local-dir pretrained_models/FireRedASR-AED-L
+```
+
+**Option B: Manual Download**
+1. Go to [FireRedASR-AED-L on Hugging Face](https://huggingface.co/FireRedTeam/FireRedASR-AED-L)
+2. Download all files to `pretrained_models/FireRedASR-AED-L/`
+
+#### 4. Clone FireRedASR Repository
+```bash
+# Clone to parent directory
+cd ..
+git clone https://github.com/FireRedTeam/FireRedASR.git
+
+# Copy fireredasr folder to your project
+cd project_video_note2
+xcopy ..\FireRedASR\fireredasr fireredasr /E /I
+
+# Clean up (optional)
+rmdir /s ..\FireRedASR
+```
+
+#### 5. Set Environment Variables (Windows)
+
+**PowerShell:**
+```powershell
+# Add to PowerShell profile
+notepad $PROFILE
+
+# Add these lines:
+$env:PATH += ";C:\Users\tongl\Downloads\project_video_note2\fireredasr;C:\Users\tongl\Downloads\project_video_note2\fireredasr\utils"
+$env:PYTHONPATH = "C:\Users\tongl\Downloads\project_video_note2"
+```
+
+**Command Prompt:**
+1. Press `Win + R`, type `sysdm.cpl`, press Enter
+2. Click "Environment Variables"
+3. Add to PATH: `C:\Users\tongl\Downloads\project_video_note2\fireredasr;C:\Users\tongl\Downloads\project_video_note2\fireredasr\utils`
+4. Add PYTHONPATH: `C:\Users\tongl\Downloads\project_video_note2`
+
+#### 6. Test Installation
+```bash
+# Test FireRedASR availability
+python -c "from firered_engine import FireRedEngine; print('FireRedASR available!')"
+
+# Start the API server
+python api_server.py
+```
+
+## API Usage
+
+### Process Audio with Whisper (Default)
+```bash
+curl -X POST http://localhost:5000/api/process-audio \
+  -F 'audio=@your_audio.wav'
+```
+
+### Process Audio with FireRedASR
+```bash
+curl -X POST http://localhost:5000/api/process-audio \
+  -F 'audio=@your_audio.wav' \
+  -F 'asr_model=firered'
+```
+
+### Process Audio with Custom Models
+```bash
+curl -X POST http://localhost:5000/api/process-audio \
+  -F 'audio=@your_audio.wav' \
+  -F 'asr_model=whisper' \
+  -F 'whisper_model=base' \
+  -F 'summ_model=qwen3:0.6b'
+```
+
+### Process Text
+```bash
+curl -X POST http://localhost:5000/api/process-text \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Your text here"}'
+```
+
+## Model Comparison
+
+| Feature | Whisper | FireRedASR |
+|---------|---------|------------|
+| **Languages** | 99+ languages | Mandarin, Chinese dialects, English |
+| **Performance** | Good general performance | SOTA on Mandarin benchmarks |
+| **Model Size** | 39MB - 3GB | 1.1B parameters (AED) |
+| **Speed** | Fast (tiny/base) | Moderate |
+| **Audio Format** | Flexible | 16kHz, 16-bit, mono |
+| **Use Case** | General purpose | Chinese/Mandarin focused |
+
+## Troubleshooting
+
+### FireRedASR not available
+- Ensure `fireredasr/` folder is in your project directory
+- Check that models are downloaded to `pretrained_models/FireRedASR-AED-L/`
+- Verify environment variables are set correctly
+
+### Audio processing errors
+- Check FFmpeg installation
+- Ensure audio files are in supported formats
+- For FireRedASR, verify audio meets format requirements (16kHz, 16-bit, mono)
+
+### Model loading issues
+- Check available disk space (models are large)
+- Verify Python dependencies are installed
+- Check system memory requirements
 
 ## URL Formats Supported
 

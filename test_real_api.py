@@ -44,7 +44,7 @@ def test_audio_processing():
     print("🎵 Testing audio processing...")
     
     # Check if test audio file exists
-    test_audio = "test_audio.wav"
+    test_audio = "test_voice.wav"
     if not os.path.exists(test_audio):
         print(f"❌ Test audio file '{test_audio}' not found")
         print("   Create a test audio file or update the path")
@@ -53,8 +53,55 @@ def test_audio_processing():
     with open(test_audio, 'rb') as f:
         files = {'audio': f}
         data = {
-            'whisper_model': 'tiny',  # Custom Whisper model
-            'summ_model': 'mistral:7b'  # Custom summary model
+            'whisper_model': 'large-v3',  # Custom Whisper model
+            'summ_model': 'qwen3:0.6b'  # Custom summary model
+        }
+        response = requests.post(f"{BASE_URL}/api/process-audio", files=files, data=data)
+    
+    print(f"Status: {response.status_code}")
+    print(f"Response: {json.dumps(response.json(), indent=2)}")
+    print()
+
+def test_audio_processing_firered():
+    """Test audio processing with FireRedASR"""
+    print("🎵 Testing audio processing with FireRedASR...")
+    
+    # Check if test audio file exists
+    test_audio = "test_voice.wav"
+    if not os.path.exists(test_audio):
+        print(f"❌ Test audio file '{test_audio}' not found")
+        print("   Create a test audio file or update the path")
+        return
+    
+    with open(test_audio, 'rb') as f:
+        files = {'audio': f}
+        data = {
+            'asr_model': 'firered',  # Use FireRedASR
+            'summ_model': 'qwen3:0.6b'  # Custom summary model
+        }
+        response = requests.post(f"{BASE_URL}/api/process-audio", files=files, data=data)
+    
+    print(f"Status: {response.status_code}")
+    print(f"Response: {json.dumps(response.json(), indent=2)}")
+    print()
+
+def test_audio_processing_whisper():
+    """Test audio processing with Whisper (explicit)"""
+    print("🎵 Testing audio processing with Whisper...")
+    
+    # Check if test audio file exists
+    test_audio = "test_voice.wav"
+    if not os.path.exists(test_audio):
+        print(f"❌ Test audio file '{test_audio}' not found")
+        print("   Create a test audio file or update the path")
+        return
+    
+    with open(test_audio, 'rb') as f:
+        files = {'audio': f}
+        data = {
+            'asr_model': 'whisper',  # Use Whisper explicitly
+            'whisper_model': 'base',  # Custom Whisper model size
+            'summ_model': 'qwen3:0.6b'  # Custom summary model
         }
         response = requests.post(f"{BASE_URL}/api/process-audio", files=files, data=data)
     
@@ -104,26 +151,33 @@ def print_curl_examples():
     print("  -H 'Content-Type: application/json' \\")
     print("  -d '{\"text\": \"Your text here\", \"summ_model\": \"llama3.1:8b\"}'")
     
-    print("\n3. Process Audio (default models):")
+    print("\n3. Process Audio (default Whisper):")
     print("curl -X POST http://localhost:5000/api/process-audio \\")
     print("  -F 'audio=@your_audio.wav'")
     
-    print("\n4. Process Audio (custom models):")
+    print("\n4. Process Audio (Whisper with custom model):")
     print("curl -X POST http://localhost:5000/api/process-audio \\")
     print("  -F 'audio=@your_audio.wav' \\")
+    print("  -F 'asr_model=whisper' \\")
     print("  -F 'whisper_model=base' \\")
     print("  -F 'summ_model=mistral:7b'")
     
-    print("\n5. Health Check:")
+    print("\n5. Process Audio (FireRedASR):")
+    print("curl -X POST http://localhost:5000/api/process-audio \\")
+    print("  -F 'audio=@your_audio.wav' \\")
+    print("  -F 'asr_model=firered' \\")
+    print("  -F 'summ_model=qwen3:0.6b'")
+    
+    print("\n6. Health Check:")
     print("curl http://localhost:5000/health")
     
-    print("\n6. List Notes:")
+    print("\n7. List Notes:")
     print("curl http://localhost:5000/api/notes")
     
-    print("\n7. Download Transcript:")
+    print("\n8. Download Transcript:")
     print("curl http://localhost:5000/api/download/{note_id}/transcript")
     
-    print("\n8. Download Summary:")
+    print("\n9. Download Summary:")
     print("curl http://localhost:5000/api/download/{note_id}/summary")
 
 if __name__ == "__main__":
@@ -133,12 +187,14 @@ if __name__ == "__main__":
     print("=" * 60)
     
     try:
-        test_health()
-        test_text_processing()
-        test_text_processing_custom_model()
+        # test_health()
+        # test_text_processing()
+        # test_text_processing_custom_model()
         test_audio_processing()
-        test_notes_listing()
-        test_download_links()
+        # test_audio_processing_whisper()
+        # test_audio_processing_firered()
+        # test_notes_listing()
+        # test_download_links()
         
         print("✅ All tests completed!")
         
